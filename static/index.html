@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DocFormat Studio — Otomatisasi Format Laporan, Makalah & Skripsi (.DOCX)</title>
+  <title>DocFormat Studio — Otomatisasi Format Laporan, Makalah &amp; Skripsi (.DOCX)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,7 +22,7 @@
       </div>
       <div class="brand-title">
         DocFormat Studio
-        <span class="brand-pill">OpenXML Engine v2.4</span>
+        <span class="brand-pill">OpenXML Engine v3.0</span>
       </div>
     </div>
 
@@ -53,7 +53,7 @@
   </header>
 
   <main class="workspace-grid">
-    <!-- LEFT COLUMN: UPLOAD, PRESETS, MODULE CHECKLIST -->
+    <!-- LEFT COLUMN: UPLOAD, PRESETS, ADAPTIVE MODULE CONTROLS -->
     <aside class="col-panel col-left">
       <div class="panel-card">
         <div class="section-header">
@@ -91,75 +91,72 @@
 
       <div class="panel-card">
         <div class="section-header">
-          <span class="section-title">3. Bagian yang Dirapikan</span>
-          <button type="button" id="btnToggleAllModules" style="border:none;background:none;color:var(--brand);font-size:11.5px;font-weight:600;cursor:pointer;">Pilih Semua</button>
+          <span class="section-title">3. Mode &amp; Cakupan Perapian</span>
         </div>
-        <div class="module-checklist" id="moduleChecklist">
-          <label class="module-chip checked" data-mod="margin">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Margin &amp; Kertas</span>
-          </label>
-          <label class="module-chip checked" data-mod="font">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Jenis Font</span>
-          </label>
-          <label class="module-chip checked" data-mod="font_size">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Ukuran Teks</span>
-          </label>
-          <label class="module-chip checked" data-mod="alignment">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Perataan Teks</span>
-          </label>
-          <label class="module-chip checked" data-mod="line_spacing">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Spasi Baris</span>
-          </label>
-          <label class="module-chip checked" data-mod="paragraph_spacing">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Jarak Paragraf</span>
-          </label>
-          <label class="module-chip checked" data-mod="indentation">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Indentasi Alenia</span>
-          </label>
-          <label class="module-chip checked" data-mod="headings">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Heading Bab/Sub</span>
-          </label>
-          <label class="module-chip checked" data-mod="page_numbers">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Nomor Halaman</span>
-          </label>
-          <label class="module-chip checked" data-mod="tables">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Format Tabel</span>
-          </label>
-          <label class="module-chip checked" data-mod="clean_empty_lines">
-            <input type="checkbox" checked />
-            <span class="chip-box">✓</span>
-            <span>Hapus Enter Kosong</span>
-          </label>
-          <label class="module-chip" data-mod="auto_toc">
-            <input type="checkbox" />
-            <span class="chip-box">✓</span>
-            <span>Daftar Isi Otomatis</span>
-          </label>
-          <label class="module-chip" data-mod="auto_cover" style="grid-column: span 2;">
-            <input type="checkbox" />
-            <span class="chip-box">✓</span>
-            <span>Buat Cover Otomatis (Jika Belum Ada)</span>
-          </label>
+
+        <div class="adaptive-controls-stack">
+          <div class="form-field">
+            <label class="form-label" for="selScopeMode">Cakupan Perapian Utama</label>
+            <select id="selScopeMode" class="select-control">
+              <option value="all" selected>Rapikan Seluruh Komponen (Rekomendasi)</option>
+              <option value="text_and_headings">Fokus Teks, Paragraf &amp; Heading Bab</option>
+              <option value="layout_only">Hanya Margin, Kertas &amp; Nomor Halaman</option>
+              <option value="custom">Kustom (Atur Per Bagian di Bawah)</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="selWhitespaceMode">Pembersihan Spasi &amp; Format Bawaan</label>
+            <select id="selWhitespaceMode" class="select-control">
+              <option value="aggressive" selected>Maksimal (Hapus Spasi Ganda, Tab Liar &amp; Enter Kosong)</option>
+              <option value="standard">Standar (Hapus Baris Kosong &amp; Rapikan Spasi Awal)</option>
+              <option value="keep">Pertahankan Spasi Bawaan Dokumen</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="selHeadingMode">Sistem Heading Bab &amp; Sub-Bab</label>
+            <select id="selHeadingMode" class="select-control">
+              <option value="Heading123" selected>Format Heading 1 / 2 / 3 Word (Outline Resmi)</option>
+              <option value="visual_only">Format Visual Saja (Tanpa Ubah Style Word)</option>
+              <option value="skip">Jangan Ubah Heading</option>
+            </select>
+          </div>
+
+          <div class="field-grid-2">
+            <div class="form-field">
+              <label class="form-label" for="selCoverMode">Halaman Cover</label>
+              <select id="selCoverMode" class="select-control">
+                <option value="auto_if_missing" selected>Otomatis Jika Belum Ada</option>
+                <option value="force">Selalu Buat Cover Baru</option>
+                <option value="skip">Jangan Tambah Cover</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="selTocMode">Daftar Isi (TOC)</label>
+              <select id="selTocMode" class="select-control">
+                <option value="auto_if_missing" selected>Otomatis Jika Belum Ada</option>
+                <option value="force">Selalu Buat Daftar Isi</option>
+                <option value="skip">Jangan Tambah</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field" id="customTargetBar">
+            <span class="form-label">Target Komponen Aktif (Klik untuk On/Off)</span>
+            <div class="pill-toggle-grid" id="targetPillGroup">
+              <button type="button" class="target-pill active" data-mod="margin">Margin &amp; Kertas</button>
+              <button type="button" class="target-pill active" data-mod="font">Jenis Font</button>
+              <button type="button" class="target-pill active" data-mod="font_size">Ukuran Teks</button>
+              <button type="button" class="target-pill active" data-mod="alignment">Perataan Teks</button>
+              <button type="button" class="target-pill active" data-mod="line_spacing">Spasi Baris</button>
+              <button type="button" class="target-pill active" data-mod="paragraph_spacing">Jarak Paragraf</button>
+              <button type="button" class="target-pill active" data-mod="indentation">Indentasi Alenia</button>
+              <button type="button" class="target-pill active" data-mod="tables">Perapian Tabel</button>
+              <button type="button" class="target-pill active" data-mod="page_numbers">Nomor Halaman</button>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -173,7 +170,7 @@
             <div class="group-title">Tata Letak Kertas &amp; Margin Halaman</div>
             <div class="group-subtitle">Atur ukuran kertas dan batas tepi (Atas, Kiri, Bawah, Kanan dalam cm)</div>
           </div>
-          <select id="paperSize" class="select-control" style="width:130px;">
+          <select id="paperSize" class="select-control" style="width:145px;">
             <option value="A4">A4 (21 × 29.7 cm)</option>
             <option value="F4">F4 / Folio (21.5 × 33 cm)</option>
             <option value="Letter">Letter (21.6 × 27.9 cm)</option>
@@ -211,12 +208,12 @@
         </div>
       </div>
 
-      <!-- GROUP B: TIPOGRAFI, JENIS FONT & UKURAN TEKS -->
+      <!-- GROUP B: TIPOGRAFI, JENIS FONT & UKURAN HEADING 1/2/3 -->
       <div class="config-group" id="groupTypography">
         <div class="group-header">
           <div>
-            <div class="group-title">Tipografi, Jenis Font &amp; Ukuran Teks</div>
-            <div class="group-subtitle">Penyeragaman huruf isi paragraf, judul bab, sub-bab, serta isi tabel</div>
+            <div class="group-title">Tipografi, Jenis Font &amp; Hierarki Ukuran Heading 1 / 2 / 3</div>
+            <div class="group-subtitle">Penyeragaman huruf isi paragraf, Heading 1 (BAB), Heading 2 (Sub-Bab), Heading 3, serta Tabel</div>
           </div>
         </div>
 
@@ -234,7 +231,7 @@
             </select>
           </div>
           <div class="form-field">
-            <label class="form-label" for="fontSizeBody">Ukuran Teks Isi (Body pt)</label>
+            <label class="form-label" for="fontSizeBody">Ukuran Teks Isi (Normal / Body)</label>
             <select id="fontSizeBody" class="select-control tnum">
               <option value="10">10 pt</option>
               <option value="11">11 pt</option>
@@ -245,29 +242,38 @@
           </div>
         </div>
 
-        <div class="field-grid-3 tnum">
+        <div class="field-grid-4 tnum">
           <div class="form-field">
-            <label class="form-label" for="fontSizeH1">Judul BAB (Heading 1)</label>
+            <label class="form-label" for="fontSizeH1">Heading 1 (BAB)</label>
             <select id="fontSizeH1" class="select-control">
-              <option value="12">12 pt (Bold)</option>
-              <option value="13">13 pt (Bold)</option>
-              <option value="14" selected>14 pt (Bold - Standar)</option>
-              <option value="16">16 pt (Bold)</option>
+              <option value="12">12 pt Bold</option>
+              <option value="13">13 pt Bold</option>
+              <option value="14" selected>14 pt Bold</option>
+              <option value="16">16 pt Bold</option>
             </select>
           </div>
           <div class="form-field">
-            <label class="form-label" for="fontSizeH2">Sub-Bab (Heading 2)</label>
+            <label class="form-label" for="fontSizeH2">Heading 2 (1.1)</label>
             <select id="fontSizeH2" class="select-control">
-              <option value="11">11 pt (Bold)</option>
-              <option value="12" selected>12 pt (Bold - Standar)</option>
-              <option value="13">13 pt (Bold)</option>
+              <option value="11">11 pt Bold</option>
+              <option value="12" selected>12 pt Bold</option>
+              <option value="13">13 pt Bold</option>
+              <option value="14">14 pt Bold</option>
             </select>
           </div>
           <div class="form-field">
-            <label class="form-label" for="fontSizeTable">Ukuran Teks Tabel</label>
+            <label class="form-label" for="fontSizeH3">Heading 3 (1.1.1)</label>
+            <select id="fontSizeH3" class="select-control">
+              <option value="11">11 pt Bold</option>
+              <option value="12" selected>12 pt Bold</option>
+              <option value="13">13 pt Bold</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fontSizeTable">Teks Tabel</label>
             <select id="fontSizeTable" class="select-control">
               <option value="9">9 pt</option>
-              <option value="10" selected>10 pt (Rapi &amp; Proporsional)</option>
+              <option value="10" selected>10 pt</option>
               <option value="11">11 pt</option>
               <option value="12">12 pt</option>
             </select>
@@ -279,8 +285,8 @@
       <div class="config-group" id="groupParagraph">
         <div class="group-header">
           <div>
-            <div class="group-title">Perataan Paragraf, Spasi Baris &amp; Indentasi</div>
-            <div class="group-subtitle">Kontrol rata kiri/kanan/tengah/justify, line spacing, dan jarak antar alenia</div>
+            <div class="group-title">Perataan Paragraf, Spasi Baris &amp; Reset Jarak Bawaan</div>
+            <div class="group-subtitle">Menghapus space berlebih bawaan dokumen lama dan menyeragamkan alenia</div>
           </div>
         </div>
 
@@ -320,44 +326,49 @@
           <div class="form-field">
             <label class="form-label" for="spaceBefore">Jarak Sebelum Paragraf (Before pt)</label>
             <select id="spaceBefore" class="select-control">
-              <option value="0" selected>0 pt (Standar)</option>
+              <option value="0" selected>0 pt (Reset Space Bawaan)</option>
               <option value="3">3 pt</option>
               <option value="6">6 pt</option>
-              <option value="12">12 pt</option>
             </select>
           </div>
           <div class="form-field">
             <label class="form-label" for="spaceAfter">Jarak Sesudah Paragraf (After pt)</label>
             <select id="spaceAfter" class="select-control">
-              <option value="0">0 pt (Rapat / Skripsi 2.0)</option>
+              <option value="0">0 pt (Rapat / Standar Skripsi 2.0)</option>
               <option value="4">4 pt</option>
               <option value="6" selected>6 pt (Standar Laporan/Makalah)</option>
               <option value="8">8 pt</option>
-              <option value="10">10 pt</option>
             </select>
           </div>
         </div>
       </div>
 
-      <!-- GROUP D: HEADING BAB, SUB-BAB & PENOMORAN HALAMAN -->
+      <!-- GROUP D: HEADING BAB (H1), SUB-BAB (H2/H3) & PENOMORAN HALAMAN -->
       <div class="config-group" id="groupStructure">
         <div class="group-header">
           <div>
-            <div class="group-title">Heading Bab, Sub-Bab &amp; Penomoran Halaman</div>
-            <div class="group-subtitle">Aturan judul BAB baru, kapitalisasi, warna teks, dan letak nomor halaman</div>
+            <div class="group-title">Format Heading 1 / 2 / 3 (Bab &amp; Sub-Bab) &amp; Nomor Halaman</div>
+            <div class="group-subtitle">Gaya tampilan BAB, orientasi Heading, dan posisi nomor halaman</div>
           </div>
         </div>
 
-        <div class="field-grid-2" style="margin-bottom:10px;">
+        <div class="field-grid-3" style="margin-bottom:12px;">
           <div class="form-field">
-            <label class="form-label" for="alignH1">Perataan Judul BAB (Heading 1)</label>
+            <label class="form-label" for="babLayout">Gaya Penulisan Judul BAB (Heading 1)</label>
+            <select id="babLayout" class="select-control">
+              <option value="single_line" selected>1 Baris (BAB I PENDAHULUAN)</option>
+              <option value="split_line">2 Baris (BAB I ↵ PENDAHULUAN)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="alignH1">Perataan Heading 1 (BAB)</label>
             <select id="alignH1" class="select-control">
-              <option value="center" selected>Rata Tengah (Center - Standar BAB)</option>
+              <option value="center" selected>Rata Tengah (Center)</option>
               <option value="left">Rata Kiri (Left)</option>
             </select>
           </div>
           <div class="form-field">
-            <label class="form-label" for="pageNumPos">Posisi Penomoran Halaman</label>
+            <label class="form-label" for="pageNumPos">Posisi Nomor Halaman</label>
             <select id="pageNumPos" class="select-control">
               <option value="bottom_right" selected>Bawah Kanan (Footer Right)</option>
               <option value="bottom_center">Bawah Tengah (Footer Center)</option>
@@ -369,7 +380,7 @@
 
         <div class="switch-row">
           <div>
-            <div class="switch-label">Mulai Setiap BAB di Halaman Baru (Page Break Before)</div>
+            <div class="switch-label">Mulai Setiap Heading 1 (BAB) di Halaman Baru (Page Break)</div>
             <div class="switch-sub">Otomatis memindahkan BAB I, BAB II, BAB III, Daftar Pustaka ke lembaran baru</div>
           </div>
           <div id="swPageBreakBab" class="toggle-switch on" role="switch" aria-checked="true"></div>
@@ -378,15 +389,15 @@
         <div class="switch-row">
           <div>
             <div class="switch-label">Kapitalisasi Judul BAB Otomatis (UPPERCASE)</div>
-            <div class="switch-sub">Mengubah "bab i pendahuluan" menjadi "BAB I PENDAHULUAN" cetak tebal</div>
+            <div class="switch-sub">Menyeragamkan Heading 1 menjadi huruf kapital cetak tebal tanpa indentasi liar</div>
           </div>
           <div id="swUppercaseBab" class="toggle-switch on" role="switch" aria-checked="true"></div>
         </div>
 
         <div class="switch-row">
           <div>
-            <div class="switch-label">Netralkan Warna Teks ke Hitam Resmi (#000000)</div>
-            <div class="switch-sub">Menghapus warna teks biru/merah/abu-abu hasil copy-paste dari web</div>
+            <div class="switch-label">Netralkan Warna Teks &amp; Highlight ke Hitam Resmi (#000000)</div>
+            <div class="switch-sub">Menghapus warna teks biru/merah/abu-abu serta background shading bawaan</div>
           </div>
           <div id="swForceBlack" class="toggle-switch on" role="switch" aria-checked="true"></div>
         </div>
@@ -396,13 +407,9 @@
       <div class="config-group" id="groupCover">
         <div class="group-header">
           <div>
-            <div class="group-title">Halaman Sampul (Cover) Otomatis</div>
-            <div class="group-subtitle">Disisipkan di halaman pertama apabila dokumen belum memiliki cover</div>
+            <div class="group-title">Data Halaman Sampul (Cover) Otomatis</div>
+            <div class="group-subtitle">Digunakan saat opsi Halaman Cover diatur ke Otomatis atau Selalu Buat Baru</div>
           </div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;cursor:pointer;">
-            <input type="checkbox" id="chkForceCover" />
-            <span>Paksa Tambah Cover</span>
-          </label>
         </div>
 
         <div class="field-grid-2" style="margin-bottom:10px;">
@@ -494,7 +501,7 @@
             <span class="stat-lbl">Status Dokumen</span>
           </div>
           <div class="stat-item">
-            <span class="stat-val" id="stExtras">Penomoran Aktif</span>
+            <span class="stat-val" id="stExtras">Heading 1/2/3 Aktif</span>
             <span class="stat-lbl">Kelengkapan</span>
           </div>
         </div>

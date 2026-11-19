@@ -3,7 +3,7 @@ const DEFAULT_PRESETS = [
     id: 'makalah',
     name: 'Makalah Akademik',
     badge: 'Populer',
-    description: 'Standar makalah perkuliahan & seminar: Margin 4-4-3-3, Times New Roman 12pt, spasi 1.5, rata kiri-kanan.',
+    description: 'Standar makalah perkuliahan & seminar: Margin 4-4-3-3, Times New Roman 12pt, spasi 1.5, Heading 1/2/3 resmi.',
     config: {
       paper_size: 'A4',
       margin_top_cm: 4.0,
@@ -26,7 +26,10 @@ const DEFAULT_PRESETS = [
       page_break_bab: true,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'bottom_right'
+      page_number_position: 'bottom_right',
+      bab_layout: 'single_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   },
   {
@@ -56,14 +59,17 @@ const DEFAULT_PRESETS = [
       page_break_bab: true,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'bottom_center'
+      page_number_position: 'bottom_center',
+      bab_layout: 'single_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   },
   {
     id: 'skripsi_tesis',
     name: 'Skripsi / Tugas Akhir / Tesis',
     badge: 'Akademik Ketat',
-    description: 'Format tugas akhir perguruan tinggi: Margin 4-4-3-3, Times New Roman 12pt, spasi 2.0 (double), indentasi 1.27 cm.',
+    description: 'Format tugas akhir perguruan tinggi: Margin 4-4-3-3, TNR 12pt, spasi 2.0, BAB 2 baris (BAB I ↵ PENDAHULUAN).',
     config: {
       paper_size: 'A4',
       margin_top_cm: 4.0,
@@ -86,7 +92,10 @@ const DEFAULT_PRESETS = [
       page_break_bab: true,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'top_right'
+      page_number_position: 'top_right',
+      bab_layout: 'split_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   },
   {
@@ -116,7 +125,10 @@ const DEFAULT_PRESETS = [
       page_break_bab: false,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'bottom_right'
+      page_number_position: 'bottom_right',
+      bab_layout: 'single_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   },
   {
@@ -146,7 +158,10 @@ const DEFAULT_PRESETS = [
       page_break_bab: false,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'bottom_center'
+      page_number_position: 'bottom_center',
+      bab_layout: 'single_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   },
   {
@@ -176,7 +191,10 @@ const DEFAULT_PRESETS = [
       page_break_bab: true,
       uppercase_bab: true,
       force_black_text: true,
-      page_number_position: 'bottom_right'
+      page_number_position: 'bottom_right',
+      bab_layout: 'single_line',
+      heading_mode: 'Heading123',
+      whitespace_cleanup_mode: 'aggressive'
     }
   }
 ];
@@ -186,6 +204,7 @@ const state = {
   inspectedInfo: null,
   activePresetId: 'makalah',
   previewTab: 'body',
+  scopeMode: 'all',
   presets: [...DEFAULT_PRESETS],
   enabledModules: {
     margin: true,
@@ -197,12 +216,13 @@ const state = {
     indentation: true,
     headings: true,
     page_numbers: true,
-    tables: true,
-    clean_empty_lines: true,
-    auto_toc: false,
-    auto_cover: false
+    tables: true
   },
-  config: { ...DEFAULT_PRESETS[0].config }
+  config: {
+    ...DEFAULT_PRESETS[0].config,
+    cover_mode: 'auto_if_missing',
+    toc_mode: 'auto_if_missing'
+  }
 };
 
 const PAPER_DIMS_CM = {
@@ -237,13 +257,15 @@ async function fetchPresetsIfBackendUp() {
     if (res.ok) {
       const data = await res.json();
       if (data.presets && data.presets.length) {
-        state.presets = data.presets;
+        state.presets = data.presets.map((p, idx) => ({
+          ...DEFAULT_PRESETS[idx],
+          ...p,
+          config: { ...(DEFAULT_PRESETS[idx] ? DEFAULT_PRESETS[idx].config : {}), ...p.config }
+        }));
         renderPresetButtons();
       }
     }
-  } catch (_) {
-    // Runs seamlessly via built-in DEFAULT_PRESETS & ClientDocxEngine
-  }
+  } catch (_) {}
 }
 
 function renderPresetButtons() {
@@ -282,8 +304,54 @@ function renderPresetButtons() {
   });
 }
 
+function applyScopePreset(mode) {
+  state.scopeMode = mode;
+  if (mode === 'all') {
+    Object.keys(state.enabledModules).forEach((k) => { state.enabledModules[k] = true; });
+    state.config.heading_mode = 'Heading123';
+    state.config.whitespace_cleanup_mode = 'aggressive';
+  } else if (mode === 'text_and_headings') {
+    state.enabledModules = {
+      margin: false,
+      font: true,
+      font_size: true,
+      alignment: true,
+      line_spacing: true,
+      paragraph_spacing: true,
+      indentation: true,
+      headings: true,
+      page_numbers: false,
+      tables: true
+    };
+    state.config.heading_mode = 'Heading123';
+    state.config.whitespace_cleanup_mode = 'aggressive';
+  } else if (mode === 'layout_only') {
+    state.enabledModules = {
+      margin: true,
+      font: false,
+      font_size: false,
+      alignment: false,
+      line_spacing: false,
+      paragraph_spacing: false,
+      indentation: false,
+      headings: false,
+      page_numbers: true,
+      tables: false
+    };
+    state.config.heading_mode = 'skip';
+  }
+  syncControlsFromState();
+  renderLivePaper();
+}
+
 function syncControlsFromState() {
   const c = state.config;
+  document.getElementById('selScopeMode').value = state.scopeMode;
+  document.getElementById('selWhitespaceMode').value = c.whitespace_cleanup_mode || 'aggressive';
+  document.getElementById('selHeadingMode').value = c.heading_mode || 'Heading123';
+  document.getElementById('selCoverMode').value = c.cover_mode || 'auto_if_missing';
+  document.getElementById('selTocMode').value = c.toc_mode || 'auto_if_missing';
+
   document.getElementById('paperSize').value = c.paper_size;
   document.getElementById('marginTop').value = c.margin_top_cm;
   document.getElementById('marginLeft').value = c.margin_left_cm;
@@ -299,6 +367,7 @@ function syncControlsFromState() {
   document.getElementById('fontSizeBody').value = String(c.font_size_body);
   document.getElementById('fontSizeH1').value = String(c.font_size_h1);
   document.getElementById('fontSizeH2').value = String(c.font_size_h2);
+  document.getElementById('fontSizeH3').value = String(c.font_size_h3 || 12);
   document.getElementById('fontSizeTable').value = String(c.font_size_table);
 
   document.querySelectorAll('#alignBodyGroup .seg-btn').forEach((b) => {
@@ -313,6 +382,7 @@ function syncControlsFromState() {
   document.getElementById('spaceBefore').value = String(c.space_before_pt);
   document.getElementById('spaceAfter').value = String(c.space_after_pt);
 
+  document.getElementById('babLayout').value = c.bab_layout || 'single_line';
   document.getElementById('alignH1').value = c.alignment_h1;
   document.getElementById('pageNumPos').value = c.page_number_position;
 
@@ -320,16 +390,13 @@ function syncControlsFromState() {
   setSwitchVisual('swUppercaseBab', c.uppercase_bab);
   setSwitchVisual('swForceBlack', c.force_black_text);
 
-  document.querySelectorAll('#moduleChecklist .module-chip').forEach((chip) => {
-    const mod = chip.dataset.mod;
-    const isChecked = !!state.enabledModules[mod];
-    chip.classList.toggle('checked', isChecked);
-    const input = chip.querySelector('input');
-    if (input) input.checked = isChecked;
+  document.querySelectorAll('#targetPillGroup .target-pill').forEach((pill) => {
+    const mod = pill.dataset.mod;
+    pill.classList.toggle('active', !!state.enabledModules[mod]);
   });
 
   document.getElementById('groupMargin').classList.toggle('disabled-module', !state.enabledModules.margin);
-  document.getElementById('groupCover').classList.toggle('disabled-module', !state.enabledModules.auto_cover);
+  document.getElementById('groupCover').classList.toggle('disabled-module', c.cover_mode === 'skip');
 }
 
 function setSwitchVisual(id, isOn) {
@@ -365,28 +432,43 @@ function bindUIEvents() {
   document.getElementById('btnLoadSample').addEventListener('click', loadSampleMessyDocx);
   document.getElementById('btnProcessDoc').addEventListener('click', processAndDownloadDocx);
 
-  document.querySelectorAll('#moduleChecklist .module-chip').forEach((chip) => {
-    chip.addEventListener('click', (e) => {
-      e.preventDefault();
-      const mod = chip.dataset.mod;
+  document.getElementById('selScopeMode').addEventListener('change', (e) => {
+    applyScopePreset(e.target.value);
+  });
+
+  document.getElementById('selWhitespaceMode').addEventListener('change', (e) => {
+    state.config.whitespace_cleanup_mode = e.target.value;
+    renderLivePaper();
+  });
+
+  document.getElementById('selHeadingMode').addEventListener('change', (e) => {
+    state.config.heading_mode = e.target.value;
+    state.enabledModules.headings = e.target.value !== 'skip';
+    renderLivePaper();
+  });
+
+  document.getElementById('selCoverMode').addEventListener('change', (e) => {
+    state.config.cover_mode = e.target.value;
+    if (e.target.value !== 'skip') setPreviewTab('cover');
+    syncControlsFromState();
+    renderLivePaper();
+  });
+
+  document.getElementById('selTocMode').addEventListener('change', (e) => {
+    state.config.toc_mode = e.target.value;
+    if (e.target.value !== 'skip') setPreviewTab('toc');
+    syncControlsFromState();
+    renderLivePaper();
+  });
+
+  document.querySelectorAll('#targetPillGroup .target-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      const mod = pill.dataset.mod;
       state.enabledModules[mod] = !state.enabledModules[mod];
-      if (mod === 'auto_cover' && state.enabledModules.auto_cover) {
-        setPreviewTab('cover');
-      } else if (mod === 'auto_toc' && state.enabledModules.auto_toc) {
-        setPreviewTab('toc');
-      }
+      state.scopeMode = 'custom';
       syncControlsFromState();
       renderLivePaper();
     });
-  });
-
-  document.getElementById('btnToggleAllModules').addEventListener('click', () => {
-    const allOn = Object.values(state.enabledModules).every(Boolean);
-    Object.keys(state.enabledModules).forEach((k) => {
-      state.enabledModules[k] = !allOn;
-    });
-    syncControlsFromState();
-    renderLivePaper();
   });
 
   document.getElementById('paperSize').addEventListener('change', (e) => {
@@ -422,11 +504,12 @@ function bindUIEvents() {
     renderLivePaper();
   });
 
-  ['fontSizeBody', 'fontSizeH1', 'fontSizeH2', 'fontSizeTable'].forEach((id) => {
+  ['fontSizeBody', 'fontSizeH1', 'fontSizeH2', 'fontSizeH3', 'fontSizeTable'].forEach((id) => {
     document.getElementById(id).addEventListener('change', () => {
       state.config.font_size_body = parseFloat(document.getElementById('fontSizeBody').value);
       state.config.font_size_h1 = parseFloat(document.getElementById('fontSizeH1').value);
       state.config.font_size_h2 = parseFloat(document.getElementById('fontSizeH2').value);
+      state.config.font_size_h3 = parseFloat(document.getElementById('fontSizeH3').value);
       state.config.font_size_table = parseFloat(document.getElementById('fontSizeTable').value);
       renderLivePaper();
     });
@@ -460,6 +543,11 @@ function bindUIEvents() {
 
   document.getElementById('spaceAfter').addEventListener('change', (e) => {
     state.config.space_after_pt = parseFloat(e.target.value);
+    renderLivePaper();
+  });
+
+  document.getElementById('babLayout').addEventListener('change', (e) => {
+    state.config.bab_layout = e.target.value;
     renderLivePaper();
   });
 
@@ -570,15 +658,9 @@ async function handleFileSelected(file) {
   if (info) {
     state.inspectedInfo = info;
     renderInspectionSummary(info);
-    if (!info.has_cover) {
-      state.enabledModules.auto_cover = true;
-    }
-    if (!info.has_toc) {
-      state.enabledModules.auto_toc = true;
-    }
     syncControlsFromState();
     renderLivePaper();
-    showToast(`Dokumen "${file.name}" siap dirapikan (${info.paragraph_count} paragraf)`);
+    showToast(`Dokumen "${file.name}" siap dirapikan (${info.paragraph_count} paragraf, ${info.heading_count} heading)`);
   }
 }
 
@@ -592,7 +674,7 @@ function renderInspectionSummary(info) {
   badges.innerHTML = `
     <span class="meta-tag tnum">${info.paragraph_count} Paragraf</span>
     <span class="meta-tag tnum">${info.word_count} Kata</span>
-    <span class="meta-tag tnum">${info.heading_count} Bab/Sub</span>
+    <span class="meta-tag tnum">${info.heading_count} Heading Bab/Sub</span>
     <span class="meta-tag tnum">${info.table_count} Tabel</span>
     <span class="meta-tag tnum">Margin Asal: ${m.top}-${m.left}-${m.bottom}-${m.right}cm</span>
     <span class="meta-tag ${info.has_cover ? 'ok' : 'warn'}">${info.has_cover ? 'Sudah Ada Cover' : 'Belum Ada Cover'}</span>
@@ -671,6 +753,7 @@ function renderLivePaper() {
   const bodyPx = (c.font_size_body * scalePt).toFixed(1);
   const h1Px = (c.font_size_h1 * scalePt).toFixed(1);
   const h2Px = (c.font_size_h2 * scalePt).toFixed(1);
+  const h3Px = ((c.font_size_h3 || 12) * scalePt).toFixed(1);
   const indentPct = ((c.first_line_indent_cm / (dims.w - c.margin_left_cm - c.margin_right_cm)) * 100).toFixed(1);
   const cssAlign = c.alignment_body === 'both' ? 'justify' : c.alignment_body;
   const lineH = (c.line_spacing * 1.15).toFixed(2);
@@ -722,7 +805,7 @@ function renderLivePaper() {
           { level: 'heading1', text: 'BAB I PENDAHULUAN' },
           { level: 'heading2', text: '1.1 Latar Belakang' },
           { level: 'heading2', text: '1.2 Rumusan Masalah' },
-          { level: 'heading2', text: '1.3 Tujuan Penulisan' },
+          { level: 'heading3', text: '1.2.1 Batasan Teknis' },
           { level: 'heading1', text: 'BAB II TINJAUAN PUSTAKA' },
           { level: 'heading2', text: '2.1 Landasan Teori' },
           { level: 'heading1', text: 'BAB III PENUTUP' },
@@ -732,7 +815,7 @@ function renderLivePaper() {
     const rowsHtml = headings.map((h, i) => {
       const isH1 = h.level === 'heading1';
       const label = (isH1 && c.uppercase_bab) ? h.text.toUpperCase() : h.text;
-      const padLeft = isH1 ? '0px' : '10px';
+      const padLeft = isH1 ? '0px' : (h.level === 'heading2' ? '10px' : '18px');
       const weight = isH1 ? '700' : '400';
       return `
         <div class="pv-toc-row" style="padding-left:${padLeft};font-weight:${weight};line-height:${lineH};">
@@ -748,26 +831,27 @@ function renderLivePaper() {
       ${rowsHtml}
     `;
   } else {
-    const babTitle = c.uppercase_bab ? 'BAB I PENDAHULUAN' : 'Bab I Pendahuluan';
+    const isSplit = c.bab_layout === 'split_line';
+    const babTitleHtml = isSplit
+      ? (c.uppercase_bab ? 'BAB I<br/>PENDAHULUAN' : 'Bab I<br/>Pendahuluan')
+      : (c.uppercase_bab ? 'BAB I PENDAHULUAN' : 'Bab I Pendahuluan');
+
     content.innerHTML = `
-      <div class="pv-h1" style="font-size:${h1Px}px;text-align:${c.alignment_h1};line-height:${lineH};">${babTitle}</div>
+      <div class="pv-h1" style="font-size:${h1Px}px;text-align:${c.alignment_h1};line-height:${lineH};">${babTitleHtml}</div>
       <div class="pv-h2" style="font-size:${h2Px}px;text-align:left;line-height:${lineH};">1.1 Latar Belakang Masalah</div>
       <p class="pv-p" style="font-size:${bodyPx}px;text-align:${cssAlign};line-height:${lineH};text-indent:${state.enabledModules.indentation ? indentPct : 0}%;margin-bottom:${paraGapPx}px;">
         Dalam penyusunan karya tulis ilmiah seperti laporan praktikum, makalah perkuliahan, proposal penelitian, hingga skripsi, konsistensi tata letak dan tipografi merupakan indikator penilaian akademik yang sangat krusial.
       </p>
+      <div class="pv-h2" style="font-size:${h3Px}px;text-align:left;line-height:${lineH};">1.1.1 Pembersihan Spasi &amp; Heading 1/2/3</div>
       <p class="pv-p" style="font-size:${bodyPx}px;text-align:${cssAlign};line-height:${lineH};text-indent:${state.enabledModules.indentation ? indentPct : 0}%;margin-bottom:${paraGapPx}px;">
-        Sistem DocFormat Studio menyeragamkan batas margin halaman ${c.margin_top_cm}-${c.margin_left_cm}-${c.margin_bottom_cm}-${c.margin_right_cm} cm, jenis huruf ${c.font_name} ${c.font_size_body}pt, spasi baris ${c.line_spacing}, serta indentasi baris pertama secara presisi.
-      </p>
-      <div class="pv-h2" style="font-size:${h2Px}px;text-align:left;line-height:${lineH};">1.2 Rumusan &amp; Batasan Masalah</div>
-      <p class="pv-p" style="font-size:${bodyPx}px;text-align:${cssAlign};line-height:${lineH};text-indent:${state.enabledModules.indentation ? indentPct : 0}%;margin-bottom:${paraGapPx}px;">
-        Berdasarkan analisis struktur dokumen, seluruh judul bab, sub-bab, tabel, serta penomoran halaman diatur otomatis mengikuti kaidah tata naskah perguruan tinggi Indonesia.
+        Seluruh spasi ganda, jarak paragraf liar bawaan dokumen lama, serta tabulasi tidak beraturan dihapus dan distandardisasi ke style Heading 1, Heading 2, dan Heading 3 resmi.
       </p>
       <div style="margin-top:4px;border:1px solid #444;font-size:${(c.font_size_table * scalePt).toFixed(1)}px;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:#f0f0f0;font-weight:700;text-align:center;border-bottom:1px solid #444;padding:2px;">
-          <span>Komponen</span><span>Standar</span><span>Status</span>
+          <span>Style Word</span><span>Ukuran</span><span>Status</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:2px 4px;">
-          <span>Margin Kertas</span><span>${c.margin_top_cm}-${c.margin_left_cm}-${c.margin_bottom_cm}-${c.margin_right_cm} cm</span><span>Terformat</span>
+          <span>Heading 1/2/3</span><span>${c.font_size_h1}/${c.font_size_h2}/${c.font_size_h3 || 12} pt</span><span>Aktif</span>
         </div>
       </div>
     `;
@@ -779,10 +863,11 @@ function renderLivePaper() {
   document.getElementById('stSpacing').textContent = `Spasi ${c.line_spacing} • ${alignLabels[c.alignment_body]}`;
 
   const extras = [];
-  if (state.enabledModules.page_numbers && c.page_number_position !== 'none') extras.push('No.Hal');
-  if (state.enabledModules.auto_cover) extras.push('Cover');
-  if (state.enabledModules.auto_toc) extras.push('Daftar Isi');
-  document.getElementById('stExtras').textContent = extras.length ? extras.join(' + ') : 'Standar Isi';
+  if (c.heading_mode === 'Heading123') extras.push('H1/H2/H3');
+  if (c.whitespace_cleanup_mode === 'aggressive') extras.push('Clean Spasi');
+  if (c.cover_mode !== 'skip') extras.push('Cover');
+  if (c.toc_mode !== 'skip') extras.push('TOC');
+  document.getElementById('stExtras').textContent = extras.length ? extras.join(' • ') : 'Standar Isi';
 }
 
 async function processAndDownloadDocx() {
@@ -799,8 +884,10 @@ async function processAndDownloadDocx() {
 
   const payloadConfig = {
     ...state.config,
-    enabled_modules: { ...state.enabledModules },
-    force_cover: document.getElementById('chkForceCover').checked,
+    enabled_modules: {
+      ...state.enabledModules,
+      headings: state.config.heading_mode !== 'skip'
+    },
     cover_data: {
       doc_label: document.getElementById('covDocLabel').value,
       course: document.getElementById('covCourse').value,
@@ -855,8 +942,8 @@ async function processAndDownloadDocx() {
     URL.revokeObjectURL(url);
 
     if (stats) {
-      document.getElementById('stParaCount').textContent = `${stats.paragraphs_formatted} Paragraf • ${stats.headings_formatted} Bab Rapi`;
-      showToast(`Selesai! ${stats.paragraphs_formatted} paragraf & ${stats.headings_formatted} heading dirapikan.`);
+      document.getElementById('stParaCount').textContent = `${stats.paragraphs_formatted} Paragraf • ${stats.headings_formatted} Heading Rapi`;
+      showToast(`Selesai! ${stats.paragraphs_formatted} paragraf, ${stats.headings_formatted} Heading 1/2/3 & ${stats.empty_lines_removed} baris kosong dirapikan.`);
     } else {
       showToast('Dokumen DOCX berhasil dirapikan & diunduh!');
     }

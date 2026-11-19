@@ -214,10 +214,13 @@ async function writeZipEntries(fileMap) {
   });
 }
 
-const BAB_REGEX = /^\s*(BAB\s+(?:[IVXLCDM]+|\d+)(?:\s*[-:.]?\s*.*)?|DAFTAR\s+(?:ISI|PUSTAKA|GAMBAR|TABEL|LAMPIRAN)|KATA\s+PENGANTAR|ABSTRAK|ABSTRACT|RINGKASAN|LAMPIRAN|PENUTUP|PENDAHULUAN)\s*$/i;
+const BAB_SPLIT_REGEX = /^\s*(BAB\s+(?:[IVXLCDM]+|\d+))\s*[-:.–—]+\s*(.+)$/i;
+const BAB_INLINE_REGEX = /^\s*(BAB\s+(?:[IVXLCDM]+|\d+))\s+(PENDAHULUAN|TINJAUAN\s+PUSTAKA.*|LANDASAN\s+TEORI.*|METODOLOGI.*|METODE\s+PENELITIAN.*|HASIL\s+DAN\s+PEMBAHASAN.*|PEMBAHASAN.*|PENUTUP|KESIMPULAN.*|SIMPULAN.*)\s*$/i;
+const BAB_REGEX = /^\s*(BAB\s+(?:[IVXLCDM]+|\d+)(?:\s*[-:.–—]?\s*.*)?|DAFTAR\s+(?:ISI|PUSTAKA|GAMBAR|TABEL|LAMPIRAN)|KATA\s+PENGANTAR|PRAKATA|ABSTRAK|ABSTRACT|RINGKASAN|LAMPIRAN|PENUTUP|PENDAHULUAN)\s*$/i;
 const SUBBAB_L2_REGEX = /^\s*(?:[A-Z]\.\s+\S+|(?:\d+|[IVXLCDM]+)\.\d+\.?\s+\S+)/i;
-const SUBBAB_L3_REGEX = /^\s*(?:\d+\.\d+\.\d+\.?\s+\S+)/i;
-const CAPTION_REGEX = /^\s*(?:Gambar|Tabel|Lampiran|Figure|Table)\s+\d+(?:[.-]\d+)?\s*[:.]?\s*\S+/i;
+const SUBBAB_L3_REGEX = /^\s*(?:\d+\.\d+\.\d+\.?\s+\S+|[a-z]\.\s+[A-Z]\S*)/;
+const SUBBAB_L4_REGEX = /^\s*(?:\d+\.\d+\.\d+\.\d+\.?\s+\S+)/i;
+const CAPTION_REGEX = /^\s*(?:Gambar|Tabel|Lampiran|Figure|Table|Bagan|Grafik)\s+\d+(?:[.-]\d+)?\s*[:.]?\s*\S+/i;
 const COVER_KEYWORDS = /^\s*(DISUSUN\s+OLEH|DIAJUKAN\s+UNTUK|OLEH\s*:|DOSEN\s+PENGAMPU|PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS|NIM\s*[:.]|NPM\s*[:.])/i;
 
 function getDirectChildren(parent, localName) {
@@ -239,6 +242,12 @@ function getFirstDirectChild(parent, localName) {
     if (n.nodeType === 1 && n.localName === localName) return n;
   }
   return null;
+}
+
+function removeDirectChildren(parent, localName) {
+  for (const ch of getDirectChildren(parent, localName)) {
+    parent.removeChild(ch);
+  }
 }
 
 function getAllDescendants(parent, localName) {
@@ -300,16 +309,17 @@ function getParagraphText(p) {
   const tNodes = getAllDescendants(p, 't');
   let s = '';
   for (const t of tNodes) {
-    s += t.textContent || '';
+    s += (t.textContent || '').replace(/\u00A0/g, ' ');
   }
-  return s.trim();
+  return s.replace(/[ \t]+/g, ' ').trim();
 }
 
 function hasMedia(p) {
   return (
     getAllDescendants(p, 'drawing').length > 0 ||
     getAllDescendants(p, 'pict').length > 0 ||
-    getAllDescendants(p, 'object').length > 0
+    getAllDescendants(p, 'object').length > 0 ||
+    getAllDescendants(p, 'oMath').length > 0
   );
 }
 
@@ -327,20 +337,71 @@ function classifyParagraph(p) {
 
   const pPr = getFirstDirectChild(p, 'pPr');
   const pStyle = pPr ? getFirstDirectChild(pPr, 'pStyle') : null;
-  const styleVal = (getWAttr(pStyle, 'val') || '').toLowerCase();
+  const styleVal = (getWAttr(pStyle, 'val') || '').toLowerCase().replace(/\s+/g, '');
+  const outlineEl = pPr ? getFirstDirectChild(pPr, 'outlineLvl') : null;
+  const lvlVal = getWAttr(outlineEl, 'val');
 
-  if (styleVal.includes('heading1') || styleVal.includes('heading 1') || styleVal.includes('judul1')) return 'heading1';
-  if (styleVal.includes('heading2') || styleVal.includes('heading 2') || styleVal.includes('judul2')) return 'heading2';
-  if (styleVal.includes('heading3') || styleVal.includes('heading 3') || styleVal.includes('judul3')) return 'heading3';
+  if ((styleVal === 'heading1' || styleVal === 'judul1' || styleVal === 'title' || lvlVal === '0') && txt.length <= 140) return 'heading1';
+  if ((styleVal === 'heading2' || styleVal === 'judul2' || styleVal === 'subtitle' || lvlVal === '1') && txt.length <= 160) return 'heading2';
+  if ((styleVal === 'heading3' || styleVal === 'judul3' || lvlVal === '2') && txt.length <= 160) return 'heading3';
+  if ((styleVal === 'heading4' || styleVal === 'judul4' || lvlVal === '3') && txt.length <= 160) return 'heading4';
   if (styleVal.includes('caption')) return 'caption';
   if (styleVal.includes('toc')) return 'toc';
 
-  if (txt.length <= 120 && BAB_REGEX.test(txt)) return 'heading1';
-  if (txt.length <= 140 && SUBBAB_L3_REGEX.test(txt)) return 'heading3';
-  if (txt.length <= 140 && SUBBAB_L2_REGEX.test(txt)) return 'heading2';
+  if (txt.length <= 120 && !txt.endsWith('.') && BAB_REGEX.test(txt)) return 'heading1';
+  if (txt.length <= 140 && !txt.endsWith('.') && SUBBAB_L4_REGEX.test(txt)) return 'heading4';
+  if (txt.length <= 140 && !txt.endsWith('.') && SUBBAB_L3_REGEX.test(txt)) return 'heading3';
+  if (txt.length <= 140 && !txt.endsWith('.') && SUBBAB_L2_REGEX.test(txt)) return 'heading2';
   if (txt.length <= 180 && CAPTION_REGEX.test(txt)) return 'caption';
   if (isListParagraph(p)) return 'list';
   return 'body';
+}
+
+function sanitizeParagraphWhitespace(xmlDoc, p, stripTabs = true, collapseSpaces = true, removeSoftBreaks = false) {
+  if (stripTabs) {
+    for (const tabEl of [...getAllDescendants(p, 'tab')]) {
+      if (tabEl.parentNode && tabEl.parentNode.localName === 'r') {
+        const tRepl = createWEl(xmlDoc, 't');
+        tRepl.textContent = ' ';
+        tabEl.parentNode.replaceChild(tRepl, tabEl);
+      }
+    }
+  }
+  if (removeSoftBreaks) {
+    for (const brEl of [...getAllDescendants(p, 'br')]) {
+      const bType = getWAttr(brEl, 'type');
+      if (bType !== 'page' && bType !== 'column' && brEl.parentNode && brEl.parentNode.localName === 'r') {
+        const tRepl = createWEl(xmlDoc, 't');
+        tRepl.textContent = ' ';
+        brEl.parentNode.replaceChild(tRepl, brEl);
+      }
+    }
+  }
+  const tNodes = getAllDescendants(p, 't');
+  if (!tNodes.length) return;
+
+  let seenNonSpace = false;
+  for (const tNode of tNodes) {
+    let txt = (tNode.textContent || '').replace(/\u00A0/g, ' ').replace(/\u200B/g, '');
+    if (collapseSpaces) {
+      txt = txt.replace(/[ \t]{2,}/g, ' ');
+    }
+    if (!seenNonSpace) {
+      txt = txt.replace(/^[ \t]+/, '');
+      if (txt.length > 0) seenNonSpace = true;
+    }
+    tNode.textContent = txt;
+    tNode.setAttributeNS(XML_NS, 'xml:space', 'preserve');
+  }
+
+  for (let i = tNodes.length - 1; i >= 0; i--) {
+    const tNode = tNodes[i];
+    if (tNode.textContent) {
+      const stripped = tNode.textContent.replace(/[ \t]+$/, '');
+      tNode.textContent = stripped;
+      if (stripped.length > 0) break;
+    }
+  }
 }
 
 function detectHasCover(paragraphs) {
@@ -364,6 +425,9 @@ function detectHasToc(paragraphs) {
 
 function setRunFontAndSize(xmlDoc, r, opts) {
   const rPr = ensureRPr(xmlDoc, r);
+  if (opts.cleanOverrides !== false) {
+    ['spacing', 'w', 'kern', 'position', 'shd', 'highlight'].forEach((tag) => removeDirectChildren(rPr, tag));
+  }
   if (opts.applyFont !== false && opts.fontName) {
     const rFonts = ensureDirectChild(xmlDoc, rPr, 'rFonts');
     setWAttr(rFonts, 'ascii', opts.fontName);
@@ -381,11 +445,15 @@ function setRunFontAndSize(xmlDoc, r, opts) {
   }
   if (opts.bold !== undefined && opts.bold !== null) {
     let b = getFirstDirectChild(rPr, 'b');
+    let bCs = getFirstDirectChild(rPr, 'bCs');
     if (opts.bold) {
       if (!b) b = ensureDirectChild(xmlDoc, rPr, 'b');
       setWAttr(b, 'val', 'true');
-    } else if (b) {
-      rPr.removeChild(b);
+      if (!bCs) bCs = ensureDirectChild(xmlDoc, rPr, 'bCs');
+      setWAttr(bCs, 'val', 'true');
+    } else {
+      if (b) rPr.removeChild(b);
+      if (bCs) rPr.removeChild(bCs);
     }
   }
   if (opts.italic !== undefined && opts.italic !== null) {
@@ -400,46 +468,116 @@ function setRunFontAndSize(xmlDoc, r, opts) {
   if (opts.colorHex) {
     const col = ensureDirectChild(xmlDoc, rPr, 'color');
     setWAttr(col, 'val', opts.colorHex.replace('#', ''));
+    ['themeColor', 'themeTint', 'themeShade'].forEach((a) => removeWAttr(col, a));
   }
 }
 
 function setParagraphFormat(xmlDoc, p, opts) {
   const pPr = ensurePPr(xmlDoc, p);
+  ['contextualSpacing', 'mirrorIndents', 'framePr', 'shd'].forEach((t) => removeDirectChildren(pPr, t));
+
+  if (opts.clearTabs) removeDirectChildren(pPr, 'tabs');
+  if (opts.clearNumPr) removeDirectChildren(pPr, 'numPr');
+
+  if (opts.styleId) {
+    const pStyle = ensureDirectChild(xmlDoc, pPr, 'pStyle');
+    setWAttr(pStyle, 'val', opts.styleId);
+  }
+  if (opts.outlineLevel !== undefined && opts.outlineLevel !== null) {
+    const ol = ensureDirectChild(xmlDoc, pPr, 'outlineLvl');
+    setWAttr(ol, 'val', opts.outlineLevel);
+  } else if (opts.styleId === 'Normal') {
+    removeDirectChildren(pPr, 'outlineLvl');
+  }
+
   if (opts.align) {
     const jc = ensureDirectChild(xmlDoc, pPr, 'jc');
     setWAttr(jc, 'val', opts.align);
   }
   if (opts.lineSpacing != null || opts.spaceBeforePt != null || opts.spaceAfterPt != null) {
     const spacing = ensureDirectChild(xmlDoc, pPr, 'spacing');
+    ['beforeAutospacing', 'afterAutospacing', 'beforeLines', 'afterLines'].forEach((a) => removeWAttr(spacing, a));
     if (opts.lineSpacing != null) {
       setWAttr(spacing, 'line', lineSpacingToTwips(opts.lineSpacing));
       setWAttr(spacing, 'lineRule', 'auto');
     }
     if (opts.spaceBeforePt != null) {
       setWAttr(spacing, 'before', ptToTwips(opts.spaceBeforePt));
-      removeWAttr(spacing, 'beforeAutospacing');
     }
     if (opts.spaceAfterPt != null) {
       setWAttr(spacing, 'after', ptToTwips(opts.spaceAfterPt));
-      removeWAttr(spacing, 'afterAutospacing');
     }
   }
-  if (opts.firstLineCm != null || opts.leftIndentCm != null) {
+  if (opts.firstLineCm != null || opts.leftIndentCm != null || opts.rightIndentCm != null) {
     const ind = ensureDirectChild(xmlDoc, pPr, 'ind');
+    ['leftChars', 'rightChars', 'firstLineChars', 'hangingChars'].forEach((a) => removeWAttr(ind, a));
     if (opts.firstLineCm != null) {
       if (opts.firstLineCm > 0) {
         setWAttr(ind, 'firstLine', cmToTwips(opts.firstLineCm));
         removeWAttr(ind, 'hanging');
       } else {
         setWAttr(ind, 'firstLine', '0');
+        removeWAttr(ind, 'hanging');
       }
     }
     if (opts.leftIndentCm != null) {
       setWAttr(ind, 'left', cmToTwips(opts.leftIndentCm));
     }
+    if (opts.rightIndentCm != null) {
+      setWAttr(ind, 'right', cmToTwips(opts.rightIndentCm));
+    }
   }
-  if (opts.keepNext) ensureDirectChild(xmlDoc, pPr, 'keepNext');
-  if (opts.pageBreakBefore) ensureDirectChild(xmlDoc, pPr, 'pageBreakBefore');
+  if (opts.keepNext) {
+    ensureDirectChild(xmlDoc, pPr, 'keepNext');
+    ensureDirectChild(xmlDoc, pPr, 'keepLines');
+  } else {
+    removeDirectChildren(pPr, 'keepNext');
+  }
+  if (opts.pageBreakBefore) {
+    ensureDirectChild(xmlDoc, pPr, 'pageBreakBefore');
+  } else {
+    removeDirectChildren(pPr, 'pageBreakBefore');
+  }
+}
+
+function formatBabHeadingRuns(xmlDoc, p, txt, babLayout, uppercaseBab, fontName, sizePt, applyFont) {
+  let cleanTxt = txt.replace(/\s+/g, ' ').trim();
+  if (uppercaseBab) cleanTxt = cleanTxt.toUpperCase();
+
+  for (const ch of [...p.childNodes]) {
+    if (ch.nodeType === 1 && ch.localName !== 'pPr') {
+      p.removeChild(ch);
+    }
+  }
+
+  if (babLayout === 'split_line') {
+    const m = cleanTxt.match(BAB_SPLIT_REGEX) || cleanTxt.match(BAB_INLINE_REGEX);
+    if (m) {
+      const r1 = createWEl(xmlDoc, 'r');
+      setRunFontAndSize(xmlDoc, r1, { fontName, sizePt, bold: true, colorHex: '000000', applyFont, applySize: true });
+      const t1 = createWEl(xmlDoc, 't');
+      t1.textContent = m[1].trim();
+      r1.appendChild(t1);
+      r1.appendChild(createWEl(xmlDoc, 'br'));
+      const t2 = createWEl(xmlDoc, 't');
+      t2.textContent = m[2].trim();
+      r1.appendChild(t2);
+      p.appendChild(r1);
+      return;
+    }
+  }
+
+  const mDash = cleanTxt.match(BAB_SPLIT_REGEX);
+  if (mDash && babLayout === 'single_line') {
+    cleanTxt = `${mDash[1].trim()} ${mDash[2].trim()}`;
+  }
+
+  const r = createWEl(xmlDoc, 'r');
+  setRunFontAndSize(xmlDoc, r, { fontName, sizePt, bold: true, colorHex: '000000', applyFont, applySize: true });
+  const t = createWEl(xmlDoc, 't');
+  t.textContent = cleanTxt;
+  r.appendChild(t);
+  p.appendChild(r);
 }
 
 function makeStyledParagraph(xmlDoc, text, fontName, sizePt, opts = {}) {
@@ -450,7 +588,12 @@ function makeStyledParagraph(xmlDoc, text, fontName, sizePt, opts = {}) {
     spaceBeforePt: opts.spaceBeforePt ?? 0,
     spaceAfterPt: opts.spaceAfterPt ?? 6,
     firstLineCm: 0,
-    pageBreakBefore: !!opts.pageBreakBefore
+    leftIndentCm: 0,
+    rightIndentCm: 0,
+    pageBreakBefore: !!opts.pageBreakBefore,
+    styleId: opts.styleId || 'Normal',
+    outlineLevel: opts.outlineLevel,
+    clearTabs: true
   });
   if (text) {
     const r = createWEl(xmlDoc, 'r');
@@ -529,7 +672,9 @@ function buildTocNodes(xmlDoc, headings, fontName, sizePt, lineSpacing) {
     spaceBeforePt: 0,
     spaceAfterPt: 18,
     lineSpacing,
-    uppercase: true
+    uppercase: true,
+    styleId: 'Heading1',
+    outlineLevel: 0
   }));
 
   const items = headings && headings.length ? headings : [
@@ -587,6 +732,107 @@ function buildTocNodes(xmlDoc, headings, fontName, sizePt, lineSpacing) {
   return nodes;
 }
 
+function buildStylesXmlString(fontName, sizeBody, sizeH1, sizeH2, sizeH3, alignH1, alignH2, lineSpacing) {
+  const lineTwips = lineSpacingToTwips(lineSpacing);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="${W_NS}">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:spacing w:before="0" w:after="120" w:line="${lineTwips}" w:lineRule="auto"/>
+      <w:jc w:val="both"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="${fontName}" w:hAnsi="${fontName}" w:cs="${fontName}" w:eastAsia="${fontName}"/>
+      <w:sz w:val="${ptToHalfPt(sizeBody)}"/>
+      <w:szCs w:val="${ptToHalfPt(sizeBody)}"/>
+      <w:color w:val="000000"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="0" w:after="240" w:line="${lineTwips}" w:lineRule="auto"/>
+      <w:ind w:left="0" w:firstLine="0"/>
+      <w:jc w:val="${alignH1}"/>
+      <w:outlineLvl w:val="0"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="${fontName}" w:hAnsi="${fontName}" w:cs="${fontName}" w:eastAsia="${fontName}"/>
+      <w:b w:val="true"/>
+      <w:bCs w:val="true"/>
+      <w:color w:val="000000"/>
+      <w:sz w:val="${ptToHalfPt(sizeH1)}"/>
+      <w:szCs w:val="${ptToHalfPt(sizeH1)}"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading2">
+    <w:name w:val="heading 2"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="200" w:after="80" w:line="${lineTwips}" w:lineRule="auto"/>
+      <w:ind w:left="0" w:firstLine="0"/>
+      <w:jc w:val="${alignH2}"/>
+      <w:outlineLvl w:val="1"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="${fontName}" w:hAnsi="${fontName}" w:cs="${fontName}" w:eastAsia="${fontName}"/>
+      <w:b w:val="true"/>
+      <w:bCs w:val="true"/>
+      <w:color w:val="000000"/>
+      <w:sz w:val="${ptToHalfPt(sizeH2)}"/>
+      <w:szCs w:val="${ptToHalfPt(sizeH2)}"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading3">
+    <w:name w:val="heading 3"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="120" w:after="40" w:line="${lineTwips}" w:lineRule="auto"/>
+      <w:ind w:left="0" w:firstLine="0"/>
+      <w:jc w:val="${alignH2}"/>
+      <w:outlineLvl w:val="2"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="${fontName}" w:hAnsi="${fontName}" w:cs="${fontName}" w:eastAsia="${fontName}"/>
+      <w:b w:val="true"/>
+      <w:bCs w:val="true"/>
+      <w:color w:val="000000"/>
+      <w:sz w:val="${ptToHalfPt(sizeH3)}"/>
+      <w:szCs w:val="${ptToHalfPt(sizeH3)}"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading4">
+    <w:name w:val="heading 4"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="80" w:after="40" w:line="${lineTwips}" w:lineRule="auto"/>
+      <w:ind w:left="0" w:firstLine="0"/>
+      <w:jc w:val="${alignH2}"/>
+      <w:outlineLvl w:val="3"/>
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="${fontName}" w:hAnsi="${fontName}" w:cs="${fontName}" w:eastAsia="${fontName}"/>
+      <w:b w:val="true"/>
+      <w:i w:val="true"/>
+      <w:color w:val="000000"/>
+      <w:sz w:val="${ptToHalfPt(sizeBody)}"/>
+      <w:szCs w:val="${ptToHalfPt(sizeBody)}"/>
+    </w:rPr>
+  </w:style>
+</w:styles>`;
+}
+
 function buildPageNumberXmlString(fontName, sizePt, align, isHeader) {
   const tag = isHeader ? 'hdr' : 'ftr';
   const half = ptToHalfPt(sizePt);
@@ -641,7 +887,7 @@ async function inspectDocxArrayBuffer(arrayBuffer, filename, sizeBytes) {
       wordCount += txt.split(/\s+/).filter(Boolean).length;
     }
     const cls = classifyParagraph(p);
-    if ((cls === 'heading1' || cls === 'heading2' || cls === 'heading3') && txt) {
+    if ((cls === 'heading1' || cls === 'heading2' || cls === 'heading3' || cls === 'heading4') && txt) {
       headings.push({ level: cls, text: txt.slice(0, 100) });
     }
   }
@@ -695,10 +941,13 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
   const doIndent = enabled.indentation !== false;
   const doHeadings = enabled.headings !== false;
   const doPageNumbers = enabled.page_numbers !== false;
-  const doCover = !!enabled.auto_cover;
-  const doToc = !!enabled.auto_toc;
   const doTables = enabled.tables !== false;
-  const doCleanEmpty = enabled.clean_empty_lines !== false;
+
+  const whitespaceMode = config.whitespace_cleanup_mode || 'aggressive';
+  const headingMode = config.heading_mode || 'Heading123';
+  const babLayout = config.bab_layout || 'single_line';
+  const coverMode = config.cover_mode || 'auto_if_missing';
+  const tocMode = config.toc_mode || 'auto_if_missing';
 
   const fontName = config.font_name || 'Times New Roman';
   const fontSizeBody = parseFloat(config.font_size_body || 12);
@@ -732,6 +981,7 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
     headings_formatted: 0,
     tables_formatted: 0,
     empty_lines_removed: 0,
+    spaces_cleaned: 0,
     cover_added: false,
     toc_added: false,
     page_numbers_added: false,
@@ -740,19 +990,13 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
 
   let paragraphs = getDirectChildren(body, 'p');
 
-  if (doCleanEmpty) {
-    let consecutiveEmpty = 0;
+  if (whitespaceMode !== 'keep') {
     for (const p of [...paragraphs]) {
       const txt = getParagraphText(p);
-      const hasBr = getAllDescendants(p, 'br').length > 0;
-      if (!txt && !hasMedia(p) && !hasBr) {
-        consecutiveEmpty++;
-        if (consecutiveEmpty >= 1) {
-          body.removeChild(p);
-          stats.empty_lines_removed++;
-        }
-      } else {
-        consecutiveEmpty = 0;
+      const hasPageBr = getAllDescendants(p, 'br').some((br) => getWAttr(br, 'type') === 'page');
+      if (!txt && !hasMedia(p) && !hasPageBr) {
+        body.removeChild(p);
+        stats.empty_lines_removed++;
       }
     }
     paragraphs = getDirectChildren(body, 'p');
@@ -764,22 +1008,38 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
   for (let idx = 0; idx < paragraphs.length; idx++) {
     const p = paragraphs[idx];
     const cls = classifyParagraph(p);
-    const txt = getParagraphText(p);
 
     if (cls === 'empty') continue;
 
     if (cls === 'media') {
-      setParagraphFormat(xmlDoc, p, { align: 'center', firstLineCm: 0, spaceBeforePt: 6, spaceAfterPt: 6 });
+      setParagraphFormat(xmlDoc, p, { align: 'center', firstLineCm: 0, leftIndentCm: 0, spaceBeforePt: 6, spaceAfterPt: 6 });
       continue;
     }
+
+    if (whitespaceMode === 'aggressive' || whitespaceMode === 'standard') {
+      sanitizeParagraphWhitespace(
+        xmlDoc,
+        p,
+        cls !== 'toc',
+        true,
+        whitespaceMode === 'aggressive' && cls === 'body'
+      );
+      stats.spaces_cleaned++;
+    }
+
+    const txt = getParagraphText(p);
+    if (!txt && !hasMedia(p)) continue;
 
     if (cls === 'caption') {
       setParagraphFormat(xmlDoc, p, {
         align: 'center',
         lineSpacing: doSpacing ? 1.15 : null,
-        spaceBeforePt: doParaSpacing ? 4 : null,
+        spaceBeforePt: doParaSpacing ? 6 : null,
         spaceAfterPt: doParaSpacing ? 8 : null,
-        firstLineCm: doIndent ? 0 : null
+        firstLineCm: 0,
+        leftIndentCm: 0,
+        styleId: 'Normal',
+        clearTabs: true
       });
       for (const r of getAllDescendants(p, 'r')) {
         setRunFontAndSize(xmlDoc, r, {
@@ -795,7 +1055,7 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
       continue;
     }
 
-    if ((cls === 'heading1' || cls === 'heading2' || cls === 'heading3') && doHeadings) {
+    if ((cls === 'heading1' || cls === 'heading2' || cls === 'heading3' || cls === 'heading4') && doHeadings && headingMode !== 'skip') {
       const estPg = Math.max(1, Math.floor(idx / 18) + 1);
       detectedHeadings.push([cls, txt, estPg]);
       stats.headings_formatted++;
@@ -806,44 +1066,69 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
         setParagraphFormat(xmlDoc, p, {
           align: alignH1,
           lineSpacing: doSpacing ? lineSpacing : null,
-          spaceBeforePt: 12,
+          spaceBeforePt: 0,
           spaceAfterPt: 12,
           firstLineCm: 0,
           leftIndentCm: 0,
+          rightIndentCm: 0,
           keepNext: true,
-          pageBreakBefore: shouldBreak
+          pageBreakBefore: shouldBreak,
+          styleId: 'Heading1',
+          outlineLevel: 0,
+          clearTabs: true,
+          clearNumPr: true
+        });
+        formatBabHeadingRuns(xmlDoc, p, txt, babLayout, uppercaseBab, fontName, fontSizeH1, doFont);
+      } else if (cls === 'heading2') {
+        setParagraphFormat(xmlDoc, p, {
+          align: alignH2,
+          lineSpacing: doSpacing ? lineSpacing : null,
+          spaceBeforePt: 10,
+          spaceAfterPt: 4,
+          firstLineCm: 0,
+          leftIndentCm: 0,
+          rightIndentCm: 0,
+          keepNext: true,
+          pageBreakBefore: false,
+          styleId: 'Heading2',
+          outlineLevel: 1,
+          clearTabs: true,
+          clearNumPr: true
         });
         for (const r of getAllDescendants(p, 'r')) {
           setRunFontAndSize(xmlDoc, r, {
             fontName,
-            sizePt: fontSizeH1,
+            sizePt: fontSizeH2,
             bold: true,
+            italic: false,
             colorHex: forceBlackText ? '000000' : null,
             applyFont: doFont,
             applySize: true
           });
-          if (uppercaseBab) {
-            for (const tNode of getDirectChildren(r, 't')) {
-              if (tNode.textContent) tNode.textContent = tNode.textContent.toUpperCase();
-            }
-          }
         }
       } else {
-        const targetSize = cls === 'heading2' ? fontSizeH2 : fontSizeH3;
+        const isH3 = cls === 'heading3';
         setParagraphFormat(xmlDoc, p, {
           align: alignH2,
           lineSpacing: doSpacing ? lineSpacing : null,
-          spaceBeforePt: cls === 'heading2' ? 10 : 6,
-          spaceAfterPt: cls === 'heading2' ? 4 : 2,
+          spaceBeforePt: 6,
+          spaceAfterPt: 2,
           firstLineCm: 0,
           leftIndentCm: 0,
-          keepNext: true
+          rightIndentCm: 0,
+          keepNext: true,
+          pageBreakBefore: false,
+          styleId: isH3 ? 'Heading3' : 'Heading4',
+          outlineLevel: isH3 ? 2 : 3,
+          clearTabs: true,
+          clearNumPr: true
         });
         for (const r of getAllDescendants(p, 'r')) {
           setRunFontAndSize(xmlDoc, r, {
             fontName,
-            sizePt: targetSize,
+            sizePt: isH3 ? fontSizeH3 : fontSizeBody,
             bold: true,
+            italic: !isH3,
             colorHex: forceBlackText ? '000000' : null,
             applyFont: doFont,
             applySize: true
@@ -854,11 +1139,17 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
     }
 
     if (cls === 'list') {
+      const pPr = getFirstDirectChild(p, 'pPr');
+      const hasNumPr = !!(pPr && getFirstDirectChild(pPr, 'numPr'));
       setParagraphFormat(xmlDoc, p, {
         align: doAlign ? alignBody : null,
         lineSpacing: doSpacing ? lineSpacing : null,
-        spaceBeforePt: doParaSpacing ? spaceBeforePt : null,
-        spaceAfterPt: doParaSpacing ? Math.max(2, spaceAfterPt / 2) : null
+        spaceBeforePt: doParaSpacing ? 0 : null,
+        spaceAfterPt: doParaSpacing ? Math.max(2, spaceAfterPt / 2) : null,
+        firstLineCm: hasNumPr ? null : 0,
+        leftIndentCm: hasNumPr ? null : 0.63,
+        rightIndentCm: 0,
+        clearTabs: true
       });
       for (const r of getAllDescendants(p, 'r')) {
         setRunFontAndSize(xmlDoc, r, {
@@ -879,7 +1170,10 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
       spaceBeforePt: doParaSpacing ? spaceBeforePt : null,
       spaceAfterPt: doParaSpacing ? spaceAfterPt : null,
       firstLineCm: doIndent ? firstLineIndentCm : null,
-      leftIndentCm: doIndent ? 0 : null
+      leftIndentCm: doIndent ? 0 : null,
+      rightIndentCm: 0,
+      styleId: 'Normal',
+      clearTabs: true
     });
     for (const r of getAllDescendants(p, 'r')) {
       setRunFontAndSize(xmlDoc, r, {
@@ -907,12 +1201,16 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
       const rows = getDirectChildren(tbl, 'tr');
       rows.forEach((row, rIdx) => {
         for (const p of getAllDescendants(row, 'p')) {
+          sanitizeParagraphWhitespace(xmlDoc, p, true, true, false);
           setParagraphFormat(xmlDoc, p, {
             align: rIdx === 0 ? 'center' : 'left',
             lineSpacing: 1.15,
             spaceBeforePt: 2,
             spaceAfterPt: 2,
-            firstLineCm: 0
+            firstLineCm: 0,
+            leftIndentCm: 0,
+            rightIndentCm: 0,
+            clearTabs: true
           });
           for (const r of getAllDescendants(p, 'r')) {
             setRunFontAndSize(xmlDoc, r, {
@@ -931,7 +1229,7 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
   }
 
   const alreadyHasToc = detectHasToc(paragraphs);
-  if (doToc && !alreadyHasToc) {
+  if (tocMode === 'force' || (tocMode === 'auto_if_missing' && !alreadyHasToc)) {
     const tocNodes = buildTocNodes(xmlDoc, detectedHeadings, fontName, fontSizeBody, lineSpacing);
     for (let i = tocNodes.length - 1; i >= 0; i--) {
       body.insertBefore(tocNodes[i], body.firstChild);
@@ -940,7 +1238,7 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
   }
 
   const alreadyHasCover = detectHasCover(paragraphs);
-  if (doCover && (!alreadyHasCover || config.force_cover)) {
+  if (coverMode === 'force' || (coverMode === 'auto_if_missing' && !alreadyHasCover)) {
     const coverNodes = buildCoverNodes(xmlDoc, config.cover_data || {}, fontName);
     for (let i = coverNodes.length - 1; i >= 0; i--) {
       body.insertBefore(coverNodes[i], body.firstChild);
@@ -973,6 +1271,11 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
       setWAttr(pgMar, 'gutter', '0');
     }
   }
+
+  fileMap.set(
+    'word/styles.xml',
+    enc.encode(buildStylesXmlString(fontName, fontSizeBody, fontSizeH1, fontSizeH2, fontSizeH3, alignH1, alignH2, lineSpacing))
+  );
 
   if (doPageNumbers && pageNumPos !== 'none') {
     const isHeader = pageNumPos.startsWith('top_');
@@ -1072,24 +1375,26 @@ async function generateSampleMessyDocxBlob() {
   const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="${W_NS}" xmlns:r="${R_NS}">
   <w:body>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Comic Sans MS" w:hAnsi="Comic Sans MS"/><w:sz w:val="32"/><w:color w:val="2563EB"/></w:rPr><w:t>Kata Pengantar</w:t></w:r></w:p>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr><w:t>Puji syukur penulis panjatkan ke hadirat Tuhan Yang Maha Esa karena atas rahmat dan karunia-Nya dokumen laporan penelitian mengenai implementasi sistem otomatisasi tata letak dokumen akademik ini dapat diselesaikan tepat pada waktunya.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:spacing w:before="400" w:after="600"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Comic Sans MS" w:hAnsi="Comic Sans MS"/><w:sz w:val="32"/><w:color w:val="2563EB"/></w:rPr><w:t>   Kata Pengantar  </w:t></w:r></w:p>
+    <w:p><w:pPr><w:spacing w:before="300" w:after="500"/><w:ind w:left="480"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr><w:t>     Puji   syukur penulis panjatkan ke hadirat Tuhan Yang Maha Esa karena atas rahmat dan karunia-Nya   dokumen laporan penelitian mengenai implementasi sistem otomatisasi tata letak dokumen akademik ini dapat diselesaikan tepat pada waktunya.</w:t></w:r></w:p>
     <w:p/>
     <w:p/>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="30"/><w:color w:val="DC2626"/></w:rPr><w:t>bab i pendahuluan</w:t></w:r></w:p>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Verdana" w:hAnsi="Verdana"/><w:sz w:val="26"/><w:color w:val="1E40AF"/></w:rPr><w:t>1.1 Latar Belakang</w:t></w:r></w:p>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr><w:t>Dalam penyusunan karya tulis ilmiah seperti laporan praktikum, makalah perkuliahan, proposal penelitian, hingga skripsi, konsistensi format penulisan merupakan salah satu indikator penilaian utama. Banyak mahasiswa maupun praktisi menghabiskan waktu berjam-jam hanya untuk menyesuaikan margin 4-4-3-3, mengubah jenis huruf menjadi Times New Roman 12pt, merapikan rata kiri-kanan (justify), serta menyusun daftar isi secara manual.</w:t></w:r></w:p>
-    <w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/></w:rPr><w:t>Kesalahan umum yang sering ditemukan pada draf dokumen mentah meliputi penggunaan font yang bercampur aduk, jarak antar paragraf yang tidak seragam, indentasi baris pertama yang dibuat menggunakan tombol spasi berulang-ulang, hingga bab baru yang tidak dimulai pada halaman baru.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:spacing w:before="400" w:after="600"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="30"/><w:color w:val="DC2626"/></w:rPr><w:t>  bab i - pendahuluan </w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Verdana" w:hAnsi="Verdana"/><w:sz w:val="26"/><w:color w:val="1E40AF"/></w:rPr><w:t>  1.1   Latar Belakang</w:t></w:r></w:p>
+    <w:p><w:pPr><w:spacing w:before="280" w:after="640"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr><w:t>      Dalam penyusunan karya tulis ilmiah seperti laporan praktikum,   makalah perkuliahan, proposal penelitian, hingga skripsi, konsistensi format penulisan merupakan salah satu indikator penilaian utama. Banyak mahasiswa maupun praktisi menghabiskan waktu berjam-jam hanya untuk menyesuaikan margin 4-4-3-3, mengubah jenis huruf menjadi Times New Roman 12pt, merapikan rata kiri-kanan (justify), serta menyusun daftar isi secara manual.</w:t></w:r></w:p>
+    <w:p><w:pPr><w:spacing w:before="300" w:after="500"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/></w:rPr><w:t>    Kesalahan umum yang sering ditemukan pada draf dokumen mentah meliputi penggunaan font yang bercampur aduk,   jarak antar paragraf yang tidak seragam, indentasi baris pertama yang dibuat menggunakan tombol spasi berulang-ulang, hingga bab baru yang tidak menggunakan style Heading 1/2/3.</w:t></w:r></w:p>
     <w:p><w:r><w:t>1.2 Rumusan Masalah</w:t></w:r></w:p>
-    <w:p><w:r><w:t>Berdasarkan uraian latar belakang di atas, maka rumusan masalah yang dibahas dalam laporan ini adalah bagaimana merancang bangun sistem perapi dokumen otomatis berbasis web yang mampu menstandardisasi struktur XML dokumen DOCX secara instan dan akurat sesuai pedoman penulisan ilmiah.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>   Berdasarkan uraian latar belakang di atas, maka rumusan masalah yang dibahas dalam laporan ini adalah bagaimana merancang bangun sistem perapi dokumen otomatis berbasis web yang mampu menstandardisasi struktur XML dokumen DOCX secara instan dan akurat sesuai pedoman penulisan ilmiah.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>1.2.1 Batasan Teknis Pemrosesan OpenXML</w:t></w:r></w:p>
+    <w:p><w:r><w:t>   Pemrosesan mencakup pembersihan spasi ganda, penghapusan jarak paragraf liar bawaan dokumen lama, serta penerapan style Heading 1, Heading 2, dan Heading 3.</w:t></w:r></w:p>
     <w:p><w:r><w:t>1.3 Tujuan Penulisan</w:t></w:r></w:p>
-    <w:p><w:r><w:t>Adapun tujuan dari penyusunan laporan ini meliputi otomatisasi pengaturan margin halaman, penyeragaman tipografi dan spasi baris, pendeteksian struktur BAB dan Sub-bab, pembuatan halaman sampul (cover) otomatis, serta penyusunan daftar isi dan nomor halaman secara terprogram.</w:t></w:r></w:p>
-    <w:p><w:r><w:t>bab ii tinjauan pustaka dan pembahasan</w:t></w:r></w:p>
+    <w:p><w:r><w:t>   Adapun tujuan dari penyusunan laporan ini meliputi otomatisasi pengaturan margin halaman, penyeragaman tipografi dan spasi baris, pendeteksian struktur BAB dan Sub-bab, pembuatan halaman sampul (cover) otomatis, serta penyusunan daftar isi dan nomor halaman secara terprogram.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>bab ii : tinjauan pustaka dan pembahasan</w:t></w:r></w:p>
     <w:p><w:r><w:t>2.1 Standar Tata Tulis Ilmiah di Indonesia</w:t></w:r></w:p>
-    <w:p><w:r><w:t>Secara umum, pedoman penulisan karya ilmiah di berbagai perguruan tinggi Indonesia menerapkan aturan kertas berukuran A4 (21 x 29,7 cm) dengan batas tepi atas 4 cm, tepi kiri 4 cm (untuk ruang penjilidan), tepi bawah 3 cm, dan tepi kanan 3 cm. Huruf standar yang digunakan adalah Times New Roman ukuran 12 poin dengan jarak spasi 1,5 baris atau 2,0 baris untuk tugas akhir.</w:t></w:r></w:p>
-    <w:p><w:r><w:t>bab iii penutup</w:t></w:r></w:p>
+    <w:p><w:r><w:t>   Secara umum, pedoman penulisan karya ilmiah di berbagai perguruan tinggi Indonesia menerapkan aturan kertas berukuran A4 (21 x 29,7 cm) dengan batas tepi atas 4 cm, tepi kiri 4 cm (untuk ruang penjilidan), tepi bawah 3 cm, dan tepi kanan 3 cm. Huruf standar yang digunakan adalah Times New Roman ukuran 12 poin dengan jarak spasi 1,5 baris atau 2,0 baris untuk tugas akhir.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>bab iii - penutup</w:t></w:r></w:p>
     <w:p><w:r><w:t>3.1 Kesimpulan</w:t></w:r></w:p>
-    <w:p><w:r><w:t>Melalui pemanfaatan mesin pemroses OpenXML terstruktur, seluruh ketidakseragaman tipografi, perataan paragraf, margin halaman, struktur bab, hingga kelengkapan halaman sampul dan daftar isi dapat diselesaikan dalam hitungan milidetik tanpa merusak konten asli dokumen.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>   Melalui pemanfaatan mesin pemroses OpenXML terstruktur, seluruh ketidakseragaman tipografi, perataan paragraf, margin halaman, struktur bab, hingga kelengkapan halaman sampul dan daftar isi dapat diselesaikan dalam hitungan milidetik tanpa merusak konten asli dokumen.</w:t></w:r></w:p>
     <w:p><w:r><w:t>Daftar Pustaka</w:t></w:r></w:p>
     <w:p><w:r><w:t>Badan Standar Nasional Pendidikan. (2024). Pedoman Tata Naskah Karya Ilmiah Perguruan Tinggi. Jakarta: Balai Pustaka.</w:t></w:r></w:p>
     <w:sectPr>
