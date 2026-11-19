@@ -9,6 +9,9 @@ NAMESPACES = {
     'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
     'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture',
+    'mc': 'http://schemas.openxmlformats.org/markup-compatibility/2006',
+    'v': 'urn:schemas-microsoft-com:vml',
+    'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math',
     'xml': 'http://www.w3.org/XML/1998/namespace'
 }
 
@@ -43,14 +46,23 @@ BAB_SPLIT_REGEX = re.compile(
 )
 
 BAB_INLINE_REGEX = re.compile(
-    r'^\s*(BAB\s+(?:[IVXLCDM]+|\d+))\s+(PENDAHULUAN|TINJAUAN\s+PUSTAKA.*|LANDASAN\s+TEORI.*|METODOLOGI.*|METODE\s+PENELITIAN.*|HASIL\s+DAN\s+PEMBAHASAN.*|PEMBAHASAN.*|PENUTUP|KESIMPULAN.*|SIMPULAN.*)\s*$',
+    r'^\s*(BAB\s+(?:[IVXLCDM]+|\d+))\s+(.+)$',
+    re.IGNORECASE
+)
+
+BAB_ONLY_REGEX = re.compile(
+    r'^\s*BAB\s+(?:[IVXLCDM]+|\d+)\s*$',
     re.IGNORECASE
 )
 
 BAB_REGEX = re.compile(
     r'^\s*(BAB\s+(?:[IVXLCDM]+|\d+)(?:\s*[-:.–—]?\s*.*)?|'
-    r'DAFTAR\s+(?:ISI|PUSTAKA|GAMBAR|TABEL|LAMPIRAN)|'
-    r'KATA\s+PENGANTAR|PRAKATA|ABSTRAK|ABSTRACT|RINGKASAN|LAMPIRAN|PENUTUP|PENDAHULUAN)\s*$',
+    r'BAGIAN\s+(?:[IVXLCDM]+|\d+)(?:\s*[-:.–—]?\s*.*)?|'
+    r'DAFTAR\s+(?:ISI|PUSTAKA|GAMBAR|TABEL|LAMPIRAN|SIMBOL|SINGKATAN)|'
+    r'KATA\s+PENGANTAR|PRAKATA|ABSTRAK|ABSTRACT|RINGKASAN|EXECUTIVE\s+SUMMARY|'
+    r'LAMPIRAN(?:\s+[A-Z0-9]+)?|PENUTUP|PENDAHULUAN|KESIMPULAN\s+DAN\s+SARAN|'
+    r'KESIMPULAN|SIMPULAN|SARAN|PEMBAHASAN|HASIL\s+DAN\s+PEMBAHASAN|'
+    r'TINJAUAN\s+PUSTAKA|LANDASAN\s+TEORI|METODOLOGI(?:\s+PENELITIAN)?|METODE\s+PENELITIAN)\s*$',
     re.IGNORECASE
 )
 
@@ -75,42 +87,142 @@ CAPTION_REGEX = re.compile(
 )
 
 COVER_KEYWORDS = re.compile(
-    r'^\s*(DISUSUN\s+OLEH|DIAJUKAN\s+UNTUK|OLEH\s*:|DOSEN\s+PENGAMPU|PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS|NIM\s*[:.]|NPM\s*[:.])',
+    r'(DISUSUN\s+OLEH|DIAJUKAN\s+UNTUK|OLEH\s*:|DOSEN\s+PENGAMPU|GURU\s+PEMBIMBING|'
+    r'PROGRAM\s+STUDI|JURUSAN|FAKULTAS|UNIVERSITAS|INSTITUT|POLITEKNIK|SEKOLAH\s+TINGGI|'
+    r'SMA\s+|SMK\s+|MAKALAH|LAPORAN\s+(?:PRAKTIKUM|AKHIR|PENELITIAN|OBSERVASI|KERJA\s+PRAKTEK|MAGANG|TUGAS)|'
+    r'SKRIPSI|TESIS|PROPOSAL|NIM\s*[:.]?|NPM\s*[:.]?|NIDN\s*[:.]?|KELOMPOK\s+\d+|TAHUN\s+AJARAN|TAHUN\s+AKADEMIK)',
+    re.IGNORECASE
+)
+
+FIRST_CONTENT_REGEX = re.compile(
+    r'^\s*(BAB\s+(?:I|1)\b|KATA\s+PENGANTAR|PRAKATA|ABSTRAK|ABSTRACT|DAFTAR\s+ISI|PENDAHULUAN|1\.\s+PENDAHULUAN|A\.\s+LATAR\s+BELAKANG|1\.1\s+LATAR\s+BELAKANG)',
     re.IGNORECASE
 )
 
 def get_paragraph_text(p_elem) -> str:
-    texts = p_elem.xpath('.//w:t/text()', namespaces=NAMESPACES)
+    texts = []
+    for t in p_elem.findall(f'.//{w_tag("t")}'):
+        if t.getparent() is not None and t.getparent().tag == w_tag('instrText'):
+            continue
+        if t.text:
+            texts.append(t.text)
     raw = ''.join(texts).replace('\u00A0', ' ')
     return re.sub(r'[ \t]+', ' ', raw).strip()
 
 def has_drawing_or_pict(p_elem) -> bool:
-    drawings = p_elem.xpath('.//w:drawing | .//w:pict | .//w:object | .//m:oMath | .//m:oMathPara', namespaces={
-        **NAMESPACES,
-        'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math'
-    })
-    return len(drawings) > 0
+    for el in p_elem.iter():
+        local = etree.QName(el).localname if isinstance(el.tag, str) else ''
+        if local in ('drawing', 'pict', 'object', 'AlternateContent', 'shape', 'imagedata', 'oMath', 'oMathPara'):
+            return True
+    return False
+
+def has_section_or_page_break(p_elem) -> bool:
+    for el in p_elem.iter():
+        local = etree.QName(el).localname if isinstance(el.tag, str) else ''
+        if local == 'sectPr':
+            return True
+        if local == 'br' and (el.get(w_tag('type')) in ('page', 'column') or el.get('type') in ('page', 'column')):
+            return True
+        if local == 'pageBreakBefore':
+            return True
+    return False
+
+def is_paragraph_bold(p_elem) -> bool:
+    runs = p_elem.findall(f'./{w_tag("r")}')
+    if not runs:
+        return False
+    non_empty_runs = 0
+    bold_runs = 0
+    for r in runs:
+        t_str = ''.join(t.text or '' for t in r.findall(f'./{w_tag("t")}')).strip()
+        if not t_str:
+            continue
+        non_empty_runs += 1
+        rPr = r.find(w_tag('rPr'))
+        if rPr is not None:
+            b = rPr.find(w_tag('b'))
+            if b is not None and b.get(w_tag('val')) not in ('false', '0'):
+                bold_runs += 1
+    return non_empty_runs > 0 and bold_runs == non_empty_runs
+
+def get_paragraph_max_font_pt(p_elem) -> float:
+    max_pt = 0.0
+    for sz in p_elem.findall(f'.//{w_tag("sz")}'):
+        v = sz.get(w_tag('val'))
+        if v and v.isdigit():
+            max_pt = max(max_pt, int(v) / 2.0)
+    return max_pt
 
 def is_list_paragraph(p_elem) -> bool:
-    num_pr = p_elem.xpath('./w:pPr/w:numPr', namespaces=NAMESPACES)
-    if num_pr:
+    pPr = p_elem.find(w_tag('pPr'))
+    if pPr is not None and pPr.find(w_tag('numPr')) is not None:
         return True
     txt = get_paragraph_text(p_elem)
-    if re.match(r'^\s*(?:[-•*]|\d+\)|[a-z]\))\s+\S+', txt):
+    if re.match(r'^\s*(?:[-•*➢▪▫]|\d+\)|[a-z]\)|\([0-9a-z]+\))\s+\S+', txt):
         return True
     return False
 
-def classify_paragraph(p_elem, idx: int, total_p: int) -> str:
+def detect_cover_boundary(paragraphs: list) -> int:
+    limit = min(45, len(paragraphs))
+    keyword_hits = 0
+    centered_short = 0
+    has_media_at_top = False
+
+    for i in range(limit):
+        p = paragraphs[i]
+        txt = get_paragraph_text(p)
+
+        if i >= 1 and txt and FIRST_CONTENT_REGEX.match(txt):
+            if keyword_hits >= 1 or has_media_at_top or centered_short >= 3:
+                return i
+            return 0
+
+        if has_drawing_or_pict(p) and i < 20:
+            has_media_at_top = True
+
+        if txt:
+            if COVER_KEYWORDS.search(txt):
+                keyword_hits += 1
+            pPr = p.find(w_tag('pPr'))
+            jc = pPr.find(w_tag('jc')) if pPr is not None else None
+            align_val = jc.get(w_tag('val')) if jc is not None else ''
+            if (align_val == 'center' or len(txt) < 85) and not txt.endswith('.'):
+                centered_short += 1
+
+        if i < limit - 1:
+            for br in p.findall(f'.//{w_tag("br")}'):
+                if br.get(w_tag('type')) == 'page':
+                    if keyword_hits >= 1 or has_media_at_top or centered_short >= 3:
+                        return i + 1
+            pPr = p.find(w_tag('pPr'))
+            if pPr is not None and pPr.find(w_tag('sectPr')) is not None:
+                if keyword_hits >= 1 or has_media_at_top or centered_short >= 3:
+                    return i + 1
+
+    if keyword_hits >= 2 or (keyword_hits >= 1 and has_media_at_top):
+        for i in range(1, limit):
+            txt = get_paragraph_text(paragraphs[i])
+            if len(txt) > 160:
+                return i
+        return min(15, limit)
+
+    return 0
+
+def classify_paragraph(p_elem, idx: int, total_p: int, prev_is_bab_only: bool = False) -> str:
     txt = get_paragraph_text(p_elem)
     if has_drawing_or_pict(p_elem) and len(txt) < 120:
         return 'media'
     if not txt:
         return 'empty'
 
-    p_style = p_elem.xpath('./w:pPr/w:pStyle/@w:val', namespaces=NAMESPACES)
-    style_val = p_style[0].lower().replace(' ', '') if p_style else ''
-    outline_lvl = p_elem.xpath('./w:pPr/w:outlineLvl/@w:val', namespaces=NAMESPACES)
-    lvl_val = outline_lvl[0] if outline_lvl else None
+    if prev_is_bab_only and len(txt) <= 100 and not txt.endswith('.'):
+        return 'heading1_sub'
+
+    pPr = p_elem.find(w_tag('pPr'))
+    pStyle = pPr.find(w_tag('pStyle')) if pPr is not None else None
+    style_val = (pStyle.get(w_tag('val')) or '').lower().replace(' ', '') if pStyle is not None else ''
+    outline_el = pPr.find(w_tag('outlineLvl')) if pPr is not None else None
+    lvl_val = outline_el.get(w_tag('val')) if outline_el is not None else None
 
     if style_val in ('heading1', 'judul1', 'title') or lvl_val == '0':
         if len(txt) <= 140:
@@ -139,8 +251,25 @@ def classify_paragraph(p_elem, idx: int, total_p: int) -> str:
         return 'heading2'
     if len(txt) <= 180 and CAPTION_REGEX.match(txt):
         return 'caption'
+
     if is_list_paragraph(p_elem):
+        num_pr = pPr.find(w_tag('numPr')) if pPr is not None else None
+        if num_pr is not None and is_paragraph_bold(p_elem) and len(txt) <= 95 and not txt.endswith('.'):
+            ilvl_el = num_pr.find(w_tag('ilvl'))
+            ilvl = ilvl_el.get(w_tag('val')) if ilvl_el is not None else '0'
+            if ilvl == '0':
+                return 'heading2_numbered'
+            if ilvl == '1':
+                return 'heading3_numbered'
         return 'list'
+
+    if is_paragraph_bold(p_elem) and len(txt) <= 85 and not txt.endswith('.') and not txt.endswith(':') and len(txt.split()) <= 12:
+        max_pt = get_paragraph_max_font_pt(p_elem)
+        jc = pPr.find(w_tag('jc')) if pPr is not None else None
+        align_val = jc.get(w_tag('val')) if jc is not None else ''
+        if max_pt >= 13.5 or (align_val == 'center' and txt.isupper()):
+            return 'heading1'
+        return 'heading2'
 
     return 'body'
 
@@ -168,24 +297,15 @@ def ensure_rPr(r_elem):
         r_elem.insert(0, rPr)
     return rPr
 
-def sanitize_paragraph_text_and_spacing(p_elem, strip_tabs: bool = True, collapse_spaces: bool = True, remove_soft_breaks: bool = False):
+def sanitize_paragraph_text_and_spacing(p_elem, strip_tabs: bool = True, collapse_spaces: bool = True):
     if strip_tabs:
-        for tab_el in p_elem.xpath('.//w:r/w:tab', namespaces=NAMESPACES):
-            parent_r = tab_el.getparent()
-            t_repl = etree.Element(w_tag('t'))
-            t_repl.text = ' '
-            parent_r.replace(tab_el, t_repl)
-
-    if remove_soft_breaks:
-        for br_el in p_elem.xpath('.//w:r/w:br', namespaces=NAMESPACES):
-            br_type = br_el.get(w_tag('type'))
-            if br_type != 'page' and br_type != 'column':
-                parent_r = br_el.getparent()
+        for r in p_elem.findall(f'./{w_tag("r")}'):
+            for tab_el in list(r.findall(w_tag('tab'))):
                 t_repl = etree.Element(w_tag('t'))
                 t_repl.text = ' '
-                parent_r.replace(br_el, t_repl)
+                r.replace(tab_el, t_repl)
 
-    t_nodes = p_elem.xpath('.//w:t', namespaces=NAMESPACES)
+    t_nodes = p_elem.findall(f'.//{w_tag("t")}')
     if not t_nodes:
         return
 
@@ -421,7 +541,7 @@ def ensure_heading_styles_in_styles_xml(styles_xml_bytes: bytes, font_name: str,
             bCs.set(w_tag('val'), 'true')
 
     upsert_style('Normal', 'Normal', size_body, 'both', False, None, 0, 6)
-    upsert_style('Heading1', 'heading 1', size_h1, align_h1, True, 0, 12, 12)
+    upsert_style('Heading1', 'heading 1', size_h1, align_h1, True, 0, 0, 12)
     upsert_style('Heading2', 'heading 2', size_h2, align_h2, True, 1, 10, 4)
     upsert_style('Heading3', 'heading 3', size_h3, align_h2, True, 2, 6, 2)
     upsert_style('Heading4', 'heading 4', size_body, align_h2, True, 3, 4, 2)
@@ -490,16 +610,10 @@ def make_page_break_paragraph():
     return p
 
 def detect_has_cover(paragraphs) -> bool:
-    first_chunk = paragraphs[:14]
-    hits = 0
-    for p in first_chunk:
-        txt = get_paragraph_text(p)
-        if len(txt) < 90 and COVER_KEYWORDS.search(txt):
-            hits += 1
-    return hits >= 2
+    return detect_cover_boundary(paragraphs) > 0
 
 def detect_has_toc(paragraphs) -> bool:
-    for p in paragraphs[:35]:
+    for p in paragraphs[:45]:
         txt = get_paragraph_text(p).strip().upper()
         if txt in ('DAFTAR ISI', 'TABLE OF CONTENTS'):
             return True
@@ -510,6 +624,9 @@ def build_cover_elements(cover_data: dict, font_name: str) -> list:
     doc_label = (cover_data.get('doc_label') or 'MAKALAH / LAPORAN').strip()
     title = (cover_data.get('title') or 'JUDUL DOKUMEN LAPORAN ATAU MAKALAH').strip()
     subtitle = (cover_data.get('subtitle') or '').strip()
+    author_mode = cover_data.get('author_mode', 'single')
+    group_name = (cover_data.get('group_name') or '').strip()
+    authors_list = cover_data.get('authors') or []
     author = (cover_data.get('author') or 'Nama Penulis').strip()
     nim = (cover_data.get('nim') or '').strip()
     lecturer = (cover_data.get('lecturer') or '').strip()
@@ -531,17 +648,32 @@ def build_cover_elements(cover_data: dict, font_name: str) -> list:
         elems.append(make_styled_paragraph("Dosen Pengampu:", font_name, 11, align='center', bold=False, space_before_pt=12, space_after_pt=2))
         elems.append(make_styled_paragraph(lecturer, font_name, 12, align='center', bold=True, space_before_pt=0, space_after_pt=24))
 
-    elems.append(make_styled_paragraph("", font_name, 12, space_before_pt=24, space_after_pt=24))
-    elems.append(make_styled_paragraph("Disusun Oleh:", font_name, 12, align='center', bold=False, space_before_pt=18, space_after_pt=6))
+    elems.append(make_styled_paragraph("", font_name, 12, space_before_pt=20, space_after_pt=20))
+    elems.append(make_styled_paragraph("Disusun Oleh:", font_name, 12, align='center', bold=False, space_before_pt=14, space_after_pt=6))
 
-    author_lines = [line.strip() for line in author.split('\n') if line.strip()]
-    for a_line in author_lines:
-        elems.append(make_styled_paragraph(a_line, font_name, 12, align='center', bold=True, space_before_pt=0, space_after_pt=2))
+    if author_mode == 'group' and authors_list:
+        if group_name:
+            elems.append(make_styled_paragraph(group_name, font_name, 12, align='center', bold=True, space_before_pt=0, space_after_pt=6, uppercase=True))
+        for idx, member in enumerate(authors_list):
+            m_name = (member.get('name') or '').strip()
+            m_nim = (member.get('nim') or '').strip()
+            if not m_name and not m_nim:
+                continue
+            line_str = f"{m_name} ({m_nim})" if (m_name and m_nim) else (m_name or m_nim)
+            after_space = 18 if idx == len(authors_list) - 1 else 3
+            elems.append(make_styled_paragraph(line_str, font_name, 12, align='center', bold=True, space_before_pt=0, space_after_pt=after_space))
+    else:
+        if authors_list and len(authors_list) >= 1:
+            m_name = (authors_list[0].get('name') or author).strip()
+            m_nim = (authors_list[0].get('nim') or nim).strip()
+        else:
+            m_name = author
+            m_nim = nim
+        elems.append(make_styled_paragraph(m_name, font_name, 12, align='center', bold=True, space_before_pt=0, space_after_pt=2))
+        if m_nim:
+            elems.append(make_styled_paragraph(f"NIM/NPM: {m_nim}", font_name, 12, align='center', bold=False, space_before_pt=0, space_after_pt=24))
 
-    if nim:
-        elems.append(make_styled_paragraph(f"NIM/NPM: {nim}", font_name, 12, align='center', bold=False, space_before_pt=0, space_after_pt=24))
-
-    elems.append(make_styled_paragraph("", font_name, 12, space_before_pt=36, space_after_pt=36))
+    elems.append(make_styled_paragraph("", font_name, 12, space_before_pt=32, space_after_pt=32))
 
     if faculty:
         elems.append(make_styled_paragraph(faculty, font_name, 14, align='center', bold=True, space_before_pt=12, space_after_pt=4, uppercase=True))
@@ -671,20 +803,30 @@ def inspect_docx_bytes(docx_bytes: bytes) -> dict:
     paragraphs = body.findall(w_tag('p')) if body is not None else []
     tables = body.findall(w_tag('tbl')) if body is not None else []
 
+    cover_end_idx = detect_cover_boundary(paragraphs)
+    has_cover = cover_end_idx > 0
+    has_toc = detect_has_toc(paragraphs)
+
     headings = []
     word_count = 0
     non_empty_p = 0
+    prev_bab_only = False
+
     for idx, p in enumerate(paragraphs):
         txt = get_paragraph_text(p)
         if txt:
             non_empty_p += 1
             word_count += len(txt.split())
-        cls = classify_paragraph(p, idx, len(paragraphs))
-        if cls in ('heading1', 'heading2', 'heading3', 'heading4') and txt:
-            headings.append({'level': cls, 'text': txt[:100]})
-
-    has_cover = detect_has_cover(paragraphs)
-    has_toc = detect_has_toc(paragraphs)
+        if idx < cover_end_idx:
+            continue
+        cls = classify_paragraph(p, idx, len(paragraphs), prev_is_bab_only=prev_bab_only)
+        prev_bab_only = bool(cls == 'heading1' and BAB_ONLY_REGEX.match(txt))
+        if cls == 'heading1_sub' and txt and headings and headings[-1]['level'] == 'heading1':
+            headings[-1]['text'] = f"{headings[-1]['text']} {txt}"[:100]
+            continue
+        if cls in ('heading1', 'heading2', 'heading3', 'heading4', 'heading2_numbered', 'heading3_numbered') and txt:
+            norm_lvl = cls.replace('_numbered', '')
+            headings.append({'level': norm_lvl, 'text': txt[:100]})
 
     sectPr = body.find(w_tag('sectPr')) if body is not None else None
     current_margins = {'top': 2.54, 'left': 2.54, 'bottom': 2.54, 'right': 2.54}
@@ -704,6 +846,7 @@ def inspect_docx_bytes(docx_bytes: bytes) -> dict:
         'headings': headings[:25],
         'has_cover': has_cover,
         'has_toc': has_toc,
+        'cover_paragraphs': cover_end_idx,
         'current_margins_cm': current_margins
     }
 
@@ -725,11 +868,6 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
     bab_layout = config.get('bab_layout', 'single_line')
     cover_mode = config.get('cover_mode', 'auto_if_missing')
     toc_mode = config.get('toc_mode', 'auto_if_missing')
-
-    if 'auto_cover' in enabled and 'cover_mode' not in config:
-        cover_mode = 'auto_if_missing' if enabled.get('auto_cover') else 'skip'
-    if 'auto_toc' in enabled and 'toc_mode' not in config:
-        toc_mode = 'auto_if_missing' if enabled.get('auto_toc') else 'skip'
 
     font_name = config.get('font_name', 'Times New Roman')
     font_size_body = float(config.get('font_size_body', 12))
@@ -765,10 +903,11 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
         'tables_formatted': 0,
         'empty_lines_removed': 0,
         'spaces_cleaned': 0,
+        'cover_preserved': False,
         'cover_added': False,
         'toc_added': False,
         'page_numbers_added': False,
-        'margins_applied': f"{margin_top_cm}-{margin_left_cm}-{margin_bottom_cm}-{margin_right_cm} cm ({paper_size})"
+        'margins_applied': f"{margin_top_cm}-{margin_left_cm}-{margin_bottom_cm}-{margin_right_cm} cm ({paperSize})" if 'paperSize' in locals() else f"{margin_top_cm}-{margin_left_cm}-{margin_bottom_cm}-{margin_right_cm} cm ({paper_size})"
     }
 
     in_mem = io.BytesIO(docx_bytes)
@@ -781,21 +920,44 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
         return docx_bytes, stats
 
     paragraphs = body.findall(w_tag('p'))
+    cover_end_idx = detect_cover_boundary(paragraphs)
+    already_has_cover = cover_end_idx > 0
+    if already_has_cover:
+        stats['cover_preserved'] = True
+
+    cover_last_elem = paragraphs[cover_end_idx - 1] if already_has_cover else None
 
     if whitespace_mode != 'keep':
-        for p in list(paragraphs):
+        for idx, p in enumerate(list(paragraphs)):
+            if idx < cover_end_idx:
+                continue
             txt = get_paragraph_text(p)
-            has_page_br = len(p.xpath('.//w:br[@w:type="page"]', namespaces=NAMESPACES)) > 0
-            if not txt and not has_drawing_or_pict(p) and not has_page_br:
+            if not txt and not has_drawing_or_pict(p) and not has_section_or_page_break(p):
                 body.remove(p)
                 stats['empty_lines_removed'] += 1
         paragraphs = body.findall(w_tag('p'))
+        if cover_last_elem is not None and cover_last_elem in paragraphs:
+            cover_end_idx = paragraphs.index(cover_last_elem) + 1
+        else:
+            cover_end_idx = 0
+
+    for idx in range(cover_end_idx):
+        p_cov = paragraphs[idx]
+        if do_font:
+            for r in p_cov.findall(f'.//{w_tag("r")}'):
+                set_run_font_and_size(r, font_name=font_name, apply_font=True, apply_size=False, clean_run_overrides=False)
+        if idx == cover_end_idx - 1 and not has_section_or_page_break(p_cov):
+            r_br = etree.SubElement(p_cov, w_tag('r'))
+            br_el = etree.SubElement(r_br, w_tag('br'))
+            br_el.set(w_tag('type'), 'page')
 
     detected_headings = []
     first_h1_seen = False
+    prev_bab_only = False
 
-    for idx, p in enumerate(paragraphs):
-        cls = classify_paragraph(p, idx, len(paragraphs))
+    for idx in range(cover_end_idx, len(paragraphs)):
+        p = paragraphs[idx]
+        cls = classify_paragraph(p, idx, len(paragraphs), prev_is_bab_only=prev_bab_only)
 
         if cls == 'empty':
             continue
@@ -808,14 +970,15 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
             sanitize_paragraph_text_and_spacing(
                 p,
                 strip_tabs=(cls != 'toc'),
-                collapse_spaces=True,
-                remove_soft_breaks=(whitespace_mode == 'aggressive' and cls == 'body')
+                collapse_spaces=True
             )
             stats['spaces_cleaned'] += 1
 
         txt = get_paragraph_text(p)
         if not txt and not has_drawing_or_pict(p):
             continue
+
+        prev_bab_only = bool(cls == 'heading1' and BAB_ONLY_REGEX.match(txt))
 
         if cls == 'caption':
             set_paragraph_format(
@@ -838,20 +1001,56 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
             stats['paragraphs_formatted'] += 1
             continue
 
-        if cls in ('heading1', 'heading2', 'heading3', 'heading4') and do_headings and heading_mode != 'skip':
-            est_pg = max(1, (idx // 18) + 1)
-            detected_headings.append((cls, txt, est_pg))
+        if cls == 'heading1_sub' and do_headings and heading_mode != 'skip':
+            if detected_headings and detected_headings[-1][0] == 'heading1':
+                prev_h = detected_headings[-1]
+                detected_headings[-1] = ('heading1', f"{prev_h[1]} {txt}", prev_h[2])
+            set_paragraph_format(
+                p,
+                align=align_h1,
+                line_spacing=line_spacing if do_spacing else None,
+                space_before_pt=0,
+                space_after_pt=12,
+                first_line_cm=0,
+                left_indent_cm=0,
+                right_indent_cm=0,
+                keep_next=True,
+                page_break_before=False,
+                style_id='Heading1',
+                outline_level=0,
+                clear_tabs=True,
+                clear_numpr=True
+            )
+            for r in p.findall(f'.//{w_tag("r")}'):
+                set_run_font_and_size(
+                    r, font_name=font_name, size_pt=font_size_h1,
+                    bold=True, color_hex='000000' if force_black_text else None,
+                    apply_font=do_font, apply_size=True
+                )
+                if uppercase_bab:
+                    for t_node in r.findall(w_tag('t')):
+                        if t_node.text:
+                            t_node.text = t_node.text.upper()
+            stats['headings_formatted'] += 1
+            continue
+
+        if cls in ('heading1', 'heading2', 'heading3', 'heading4', 'heading2_numbered', 'heading3_numbered') and do_headings and heading_mode != 'skip':
+            est_pg = max(1, ((idx - cover_end_idx) // 18) + 1)
+            norm_cls = cls.replace('_numbered', '')
+            keep_numpr = cls.endswith('_numbered')
+            detected_headings.append((norm_cls, txt, est_pg))
             stats['headings_formatted'] += 1
 
-            if cls == 'heading1':
+            if norm_cls == 'heading1':
                 should_break = page_break_bab and first_h1_seen
                 first_h1_seen = True
+                is_bab_only = bool(BAB_ONLY_REGEX.match(txt))
                 set_paragraph_format(
                     p,
                     align=align_h1,
                     line_spacing=line_spacing if do_spacing else None,
                     space_before_pt=0,
-                    space_after_pt=12,
+                    space_after_pt=2 if is_bab_only else 12,
                     first_line_cm=0,
                     left_indent_cm=0,
                     right_indent_cm=0,
@@ -867,22 +1066,22 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
                     font_name=font_name, size_pt=font_size_h1, apply_font=do_font
                 )
 
-            elif cls == 'heading2':
+            elif norm_cls == 'heading2':
                 set_paragraph_format(
                     p,
                     align=align_h2,
                     line_spacing=line_spacing if do_spacing else None,
                     space_before_pt=10,
                     space_after_pt=4,
-                    first_line_cm=0,
-                    left_indent_cm=0,
+                    first_line_cm=None if keep_numpr else 0,
+                    left_indent_cm=None if keep_numpr else 0,
                     right_indent_cm=0,
                     keep_next=True,
                     page_break_before=False,
                     style_id='Heading2',
                     outline_level=1,
                     clear_tabs=True,
-                    clear_numpr=True
+                    clear_numpr=not keep_numpr
                 )
                 for r in p.findall(f'.//{w_tag("r")}'):
                     set_run_font_and_size(
@@ -891,37 +1090,38 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
                         apply_font=do_font, apply_size=True
                     )
 
-            elif cls in ('heading3', 'heading4'):
-                lvl_num = 2 if cls == 'heading3' else 3
-                st_id = 'Heading3' if cls == 'heading3' else 'Heading4'
-                t_sz = font_size_h3 if cls == 'heading3' else font_size_body
+            elif norm_cls in ('heading3', 'heading4'):
+                lvl_num = 2 if norm_cls == 'heading3' else 3
+                st_id = 'Heading3' if norm_cls == 'heading3' else 'Heading4'
+                t_sz = font_size_h3 if norm_cls == 'heading3' else font_size_body
                 set_paragraph_format(
                     p,
                     align=align_h2,
                     line_spacing=line_spacing if do_spacing else None,
                     space_before_pt=6,
                     space_after_pt=2,
-                    first_line_cm=0,
-                    left_indent_cm=0,
+                    first_line_cm=None if keep_numpr else 0,
+                    left_indent_cm=None if keep_numpr else 0,
                     right_indent_cm=0,
                     keep_next=True,
                     page_break_before=False,
                     style_id=st_id,
                     outline_level=lvl_num,
                     clear_tabs=True,
-                    clear_numpr=True
+                    clear_numpr=not keep_numpr
                 )
                 for r in p.findall(f'.//{w_tag("r")}'):
                     set_run_font_and_size(
                         r, font_name=font_name, size_pt=t_sz,
-                        bold=True, italic=(cls == 'heading4'),
+                        bold=True, italic=(norm_cls == 'heading4'),
                         color_hex='000000' if force_black_text else None,
                         apply_font=do_font, apply_size=True
                     )
             continue
 
         if cls == 'list':
-            has_numpr = len(p.xpath('./w:pPr/w:numPr', namespaces=NAMESPACES)) > 0
+            pPr = p.find(w_tag('pPr'))
+            has_numpr = pPr is not None and pPr.find(w_tag('numPr')) is not None
             set_paragraph_format(
                 p,
                 align=align_body if do_align else None,
@@ -997,13 +1197,17 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
             stats['tables_formatted'] += 1
 
     already_has_toc = detect_has_toc(paragraphs)
+    toc_insert_pos = 0
+    if already_has_cover and cover_end_idx > 0 and cover_end_idx <= len(paragraphs):
+        last_cov_p = paragraphs[cover_end_idx - 1]
+        toc_insert_pos = list(body).index(last_cov_p) + 1
+
     if (toc_mode == 'force') or (toc_mode == 'auto_if_missing' and not already_has_toc):
         toc_elems = build_toc_elements(detected_headings, font_name, font_size_body, line_spacing)
         for elem in reversed(toc_elems):
-            body.insert(0, elem)
+            body.insert(toc_insert_pos, elem)
         stats['toc_added'] = True
 
-    already_has_cover = detect_has_cover(paragraphs)
     if (cover_mode == 'force') or (cover_mode == 'auto_if_missing' and not already_has_cover):
         cover_data = config.get('cover_data', {})
         cover_elems = build_cover_elements(cover_data, font_name)
@@ -1099,7 +1303,7 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
             ref_el.set(f"{{{NAMESPACES['r']}}}id", rel_id)
             sectPr.insert(0, ref_el)
 
-            if stats['cover_added']:
+            if stats['cover_added'] or stats['cover_preserved']:
                 ensure_child(sectPr, 'titlePg')
 
         stats['page_numbers_added'] = True
@@ -1157,7 +1361,7 @@ def create_sample_messy_docx() -> bytes:
         ("    Kesalahan umum yang sering ditemukan pada draf dokumen mentah meliputi penggunaan font yang bercampur aduk (seperti Calibri, Arial, dan Times New Roman dalam satu naskah),   jarak antar paragraf yang terlalu lebar, indentasi baris pertama yang dibuat menggunakan tombol spasi berulang-ulang, hingga bab baru yang tidak menggunakan style Heading 1/2/3 resmi.", "Arial", 10, "center", "#374151", 40),
         (" 1.2 Rumusan Masalah", "Calibri", 12, "left", "#000000", 20),
         ("     Berdasarkan uraian latar belakang di atas, maka rumusan masalah yang dibahas dalam laporan ini adalah bagaimana merancang bangun sistem perapi dokumen otomatis berbasis web yang mampu menstandardisasi struktur XML dokumen DOCX secara instan dan akurat sesuai pedoman penulisan ilmiah.", "Calibri", 11, "left", "#000000", 25),
-        ("1.2.1 Batasan Teknis Pemrosesan OpenXML", "Calibri", 11, "left", "#000000", 18),
+        ("1.2.1 Batasan Teknis Pemrosesan", "Calibri", 11, "left", "#000000", 18),
         ("   Pemrosesan mencakup pembersihan spasi ganda, penghapusan jarak paragraf liar bawaan dokumen lama, serta penerapan style Heading 1, Heading 2, dan Heading 3.", "Calibri", 11, "left", "#000000", 22),
         ("1.3 Tujuan Penulisan", "Calibri", 12, "left", "#000000", 18),
         ("   Adapun tujuan dari penyusunan laporan ini meliputi otomatisasi pengaturan margin halaman, penyeragaman tipografi dan spasi baris, pendeteksian struktur BAB dan Sub-bab, pembuatan halaman sampul (cover) otomatis, serta penyusunan daftar isi dan nomor halaman secara terprogram.", "Calibri", 11, "left", "#000000", 20),
@@ -1197,7 +1401,7 @@ def create_sample_messy_docx() -> bytes:
     closing_paras = [
         ("bab iii - penutup", "Arial", 14, "left", "#059669"),
         ("3.1 Kesimpulan", "Calibri", 12, "left", "#000000"),
-        ("     Melalui pemanfaatan mesin pemroses OpenXML terstruktur, seluruh ketidakseragaman tipografi, perataan paragraf, margin halaman, struktur bab Heading 1/2/3, hingga kelengkapan halaman sampul dan daftar isi dapat diselesaikan dalam hitungan milidetik tanpa merusak konten asli dokumen.", "Calibri", 11, "left", "#000000"),
+        ("     Melalui pemanfaatan mesin pemroses terstruktur, seluruh ketidakseragaman tipografi, perataan paragraf, margin halaman, struktur bab Heading 1/2/3, hingga kelengkapan halaman sampul dan daftar isi dapat diselesaikan dalam hitungan milidetik tanpa merusak konten asli dokumen.", "Calibri", 11, "left", "#000000"),
         ("Daftar Pustaka", "Calibri", 14, "left", "#000000"),
         ("Badan Standar Nasional Pendidikan. (2024). Pedoman Tata Naskah Karya Ilmiah Perguruan Tinggi. Jakarta: Balai Pustaka.", "Calibri", 11, "left", "#000000"),
         ("Kowalski, E., & Ponytail, S. (2025). Modern Document Engineering & Typographic Systems. Bandung: ITB Press.", "Calibri", 11, "left", "#000000")

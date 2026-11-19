@@ -846,30 +846,118 @@ html, body {
   padding: 13px 15px;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 8px;
+.spec-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 9px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.stat-item {
-  background: var(--bg-subtle);
-  padding: 7px 10px;
-  border-radius: 7px;
+.spec-meta-text {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spec-meta-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.spec-table-list {
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
-.stat-val {
-  font-weight: 700;
-  font-size: 14px;
+.spec-row-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.spec-row-key {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.spec-row-val {
   color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
 }
 
-.stat-lbl {
-  font-size: 11px;
+.member-list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.member-row {
+  display: grid;
+  grid-template-columns: 24px 1.3fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+  animation: slideFadeIn 180ms var(--ease-out);
+}
+
+.member-idx {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.btn-icon-remove {
+  height: 32px;
+  width: 32px;
+  border-radius: 7px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
   color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 140ms var(--ease-out);
+}
+
+.btn-icon-remove:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.btn-add-member {
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 150ms var(--ease-out);
+}
+
+.btn-add-member:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-primary);
 }
 
 @keyframes slideFadeIn {

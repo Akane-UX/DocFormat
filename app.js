@@ -205,6 +205,11 @@ const state = {
   activePresetId: 'makalah',
   previewTab: 'body',
   scopeMode: 'all',
+  authorMode: 'single',
+  groupMembers: [
+    { name: '', nim: '' },
+    { name: '', nim: '' }
+  ],
   presets: [...DEFAULT_PRESETS],
   enabledModules: {
     margin: true,
@@ -245,10 +250,62 @@ function showToast(msg) {
 
 async function initApp() {
   renderPresetButtons();
+  renderGroupMembersList();
   bindUIEvents();
   syncControlsFromState();
   renderLivePaper();
   fetchPresetsIfBackendUp();
+}
+
+function renderGroupMembersList() {
+  const container = document.getElementById('groupMembersList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const sampleNamePlaceholders = ['Ahmad Fauzan', 'Budi Santoso', 'Citra Lestari', 'Dian Pratama', 'Eka Putri'];
+  const sampleNimPlaceholders = ['2201040089', '2201040092', '2201040105', '2201040118', '2201040124'];
+
+  state.groupMembers.forEach((m, idx) => {
+    const row = document.createElement('div');
+    row.className = 'member-row';
+    const phName = sampleNamePlaceholders[idx % sampleNamePlaceholders.length];
+    const phNim = sampleNimPlaceholders[idx % sampleNimPlaceholders.length];
+    row.innerHTML = `
+      <span class="member-idx tnum">${idx + 1}.</span>
+      <input type="text" class="input-control member-name-input" placeholder="Contoh: ${phName}" value="${escapeHtml(m.name)}" />
+      <input type="text" class="input-control tnum member-nim-input" placeholder="Contoh: ${phNim}" value="${escapeHtml(m.nim)}" />
+      <button type="button" class="btn-icon-remove" title="Hapus anggota" ${state.groupMembers.length <= 1 ? 'disabled style="opacity:0.35;pointer-events:none;"' : ''}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    `;
+
+    const nameInp = row.querySelector('.member-name-input');
+    const nimInp = row.querySelector('.member-nim-input');
+    const delBtn = row.querySelector('.btn-icon-remove');
+
+    nameInp.addEventListener('input', (e) => {
+      state.groupMembers[idx].name = e.target.value;
+      if (state.previewTab === 'cover') renderLivePaper();
+    });
+
+    nimInp.addEventListener('input', (e) => {
+      state.groupMembers[idx].nim = e.target.value;
+      if (state.previewTab === 'cover') renderLivePaper();
+    });
+
+    delBtn.addEventListener('click', () => {
+      if (state.groupMembers.length > 1) {
+        state.groupMembers.splice(idx, 1);
+        renderGroupMembersList();
+        if (state.previewTab === 'cover') renderLivePaper();
+      }
+    });
+
+    container.appendChild(row);
+  });
 }
 
 async function fetchPresetsIfBackendUp() {
@@ -294,7 +351,7 @@ function renderPresetButtons() {
         jurnal_artikel: 'ARTIKEL ILMIAH',
         laporan_kantor: 'LAPORAN KINERJA & DINAS'
       };
-      document.getElementById('covDocLabel').value = labelMap[p.id] || 'LAPORAN';
+      document.getElementById('covDocLabel').placeholder = `Contoh: ${labelMap[p.id] || 'LAPORAN'}`;
       renderPresetButtons();
       syncControlsFromState();
       renderLivePaper();
@@ -397,6 +454,12 @@ function syncControlsFromState() {
 
   document.getElementById('groupMargin').classList.toggle('disabled-module', !state.enabledModules.margin);
   document.getElementById('groupCover').classList.toggle('disabled-module', c.cover_mode === 'skip');
+
+  document.querySelectorAll('#authorModeGroup .seg-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === state.authorMode);
+  });
+  document.getElementById('singleAuthorSection').style.display = state.authorMode === 'single' ? 'grid' : 'none';
+  document.getElementById('groupAuthorSection').style.display = state.authorMode === 'group' ? 'block' : 'none';
 }
 
 function setSwitchVisual(id, isOn) {
@@ -579,13 +642,33 @@ function bindUIEvents() {
     renderLivePaper();
   });
 
-  ['covDocLabel', 'covCourse', 'covTitle', 'covAuthor', 'covNim', 'covLecturer', 'covFaculty', 'covInstitution', 'covYear'].forEach((id) => {
-    document.getElementById(id).addEventListener('input', () => {
-      if (state.previewTab === 'cover') {
-        renderLivePaper();
-      }
+  ['covDocLabel', 'covCourse', 'covTitle', 'covAuthor', 'covNim', 'covGroupName', 'covLecturer', 'covFaculty', 'covInstitution', 'covYear'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        if (state.previewTab === 'cover') {
+          renderLivePaper();
+        }
+      });
+    }
+  });
+
+  document.querySelectorAll('#authorModeGroup .seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.authorMode = btn.dataset.mode;
+      syncControlsFromState();
+      setPreviewTab('cover');
     });
   });
+
+  const btnAddMember = document.getElementById('btnAddMember');
+  if (btnAddMember) {
+    btnAddMember.addEventListener('click', () => {
+      state.groupMembers.push({ name: '', nim: '' });
+      renderGroupMembersList();
+      if (state.previewTab === 'cover') renderLivePaper();
+    });
+  }
 
   document.querySelectorAll('#previewTabs .preview-tab').forEach((tabBtn) => {
     tabBtn.addEventListener('click', () => {
@@ -657,6 +740,16 @@ async function handleFileSelected(file) {
 
   if (info) {
     state.inspectedInfo = info;
+    if (info.has_cover) {
+      state.config.cover_mode = 'skip';
+    } else {
+      state.config.cover_mode = 'auto_if_missing';
+    }
+    if (info.has_toc) {
+      state.config.toc_mode = 'skip';
+    } else {
+      state.config.toc_mode = 'auto_if_missing';
+    }
     renderInspectionSummary(info);
     syncControlsFromState();
     renderLivePaper();
@@ -677,7 +770,7 @@ function renderInspectionSummary(info) {
     <span class="meta-tag tnum">${info.heading_count} Heading Bab/Sub</span>
     <span class="meta-tag tnum">${info.table_count} Tabel</span>
     <span class="meta-tag tnum">Margin Asal: ${m.top}-${m.left}-${m.bottom}-${m.right}cm</span>
-    <span class="meta-tag ${info.has_cover ? 'ok' : 'warn'}">${info.has_cover ? 'Sudah Ada Cover' : 'Belum Ada Cover'}</span>
+    <span class="meta-tag ${info.has_cover ? 'ok' : 'warn'}">${info.has_cover ? `Cover Asli Terdeteksi (${info.cover_paragraphs || ''} Baris Dilindungi)` : 'Belum Ada Cover'}</span>
     <span class="meta-tag ${info.has_toc ? 'ok' : 'warn'}">${info.has_toc ? 'Sudah Ada Daftar Isi' : 'Belum Ada Daftar Isi'}</span>
   `;
 
@@ -765,10 +858,36 @@ function renderLivePaper() {
     const course = document.getElementById('covCourse').value || '';
     const author = document.getElementById('covAuthor').value || 'Nama Penyusun';
     const nim = document.getElementById('covNim').value || '';
+    const groupName = (document.getElementById('covGroupName') ? document.getElementById('covGroupName').value : '') || '';
     const lecturer = document.getElementById('covLecturer').value || '';
     const fac = document.getElementById('covFaculty').value || '';
     const inst = document.getElementById('covInstitution').value || '';
     const yr = document.getElementById('covYear').value || '2026';
+
+    let authorBlockHtml = '';
+    if (state.authorMode === 'group') {
+      const membersHtml = state.groupMembers
+        .filter((m) => (m.name && m.name.trim()) || (m.nim && m.nim.trim()))
+        .slice(0, 6)
+        .map((m) => {
+          const n = (m.name || '').trim();
+          const idNum = (m.nim || '').trim();
+          const line = (n && idNum) ? `${escapeHtml(n)} (${escapeHtml(idNum)})` : escapeHtml(n || idNum);
+          return `<div style="font-weight:700;font-size:${(bodyPx * 0.94).toFixed(1)}px;">${line}</div>`;
+        })
+        .join('');
+      authorBlockHtml = `
+        <div>Disusun Oleh:</div>
+        ${groupName ? `<div style="font-weight:700;margin-bottom:2px;">${escapeHtml(groupName.toUpperCase())}</div>` : ''}
+        ${membersHtml || '<div style="font-weight:700;">Nama Anggota (NIM)</div>'}
+      `;
+    } else {
+      authorBlockHtml = `
+        <div>Disusun Oleh:</div>
+        <div style="font-weight:700;">${escapeHtml(author)}</div>
+        ${nim ? `<div style="font-size:${(bodyPx * 0.92).toFixed(1)}px;">NIM/NPM: ${escapeHtml(nim)}</div>` : ''}
+      `;
+    }
 
     content.innerHTML = `
       <div class="pv-cover-box">
@@ -784,9 +903,7 @@ function renderLivePaper() {
 
         <div style="font-size:${bodyPx}px;line-height:1.45;">
           ${lecturer ? `<div style="margin-bottom:6px;">Dosen Pengampu:<br/><b>${escapeHtml(lecturer)}</b></div>` : ''}
-          <div>Disusun Oleh:</div>
-          <div style="font-weight:700;">${escapeHtml(author)}</div>
-          ${nim ? `<div style="font-size:${(bodyPx * 0.92).toFixed(1)}px;">NIM/NPM: ${escapeHtml(nim)}</div>` : ''}
+          ${authorBlockHtml}
         </div>
 
         <div style="font-weight:700;font-size:${(h2Px * 0.96).toFixed(1)}px;line-height:1.35;">
@@ -857,16 +974,19 @@ function renderLivePaper() {
     `;
   }
 
-  const alignLabels = { both: 'Justify', left: 'Rata Kiri', center: 'Rata Tengah', right: 'Rata Kanan' };
-  document.getElementById('activeSpecBadge').textContent = `${c.paper_size} • ${c.margin_top_cm}-${c.margin_left_cm}-${c.margin_bottom_cm}-${c.margin_right_cm}`;
-  document.getElementById('stFont').textContent = `${c.font_name} (${c.font_size_body}pt)`;
+  const alignLabels = { both: 'Rata Kiri-Kanan', left: 'Rata Kiri', center: 'Rata Tengah', right: 'Rata Kanan' };
+  const paperEl = document.getElementById('specPaperText');
+  const marginEl = document.getElementById('specMarginText');
+  if (paperEl) paperEl.textContent = `Kertas ${c.paper_size}`;
+  if (marginEl) marginEl.textContent = `${c.margin_top_cm} / ${c.margin_left_cm} / ${c.margin_bottom_cm} / ${c.margin_right_cm} cm`;
+
+  document.getElementById('stFont').textContent = `${c.font_name}, ${c.font_size_body} pt`;
   document.getElementById('stSpacing').textContent = `Spasi ${c.line_spacing} • ${alignLabels[c.alignment_body]}`;
 
   const extras = [];
-  if (c.heading_mode === 'Heading123') extras.push('H1/H2/H3');
-  if (c.whitespace_cleanup_mode === 'aggressive') extras.push('Clean Spasi');
-  if (c.cover_mode !== 'skip') extras.push('Cover');
-  if (c.toc_mode !== 'skip') extras.push('TOC');
+  if (c.heading_mode === 'Heading123') extras.push('Heading 1/2/3');
+  if (c.cover_mode !== 'skip') extras.push(state.authorMode === 'group' ? `Cover (${state.groupMembers.length} Anggota)` : 'Cover');
+  if (c.toc_mode !== 'skip') extras.push('Daftar Isi');
   document.getElementById('stExtras').textContent = extras.length ? extras.join(' • ') : 'Standar Isi';
 }
 
@@ -879,8 +999,12 @@ async function processAndDownloadDocx() {
   const btn = document.getElementById('btnProcessDoc');
   const lbl = document.getElementById('btnProcessLabel');
   const origText = lbl.textContent;
-  lbl.textContent = 'Memproses OpenXML...';
+  lbl.textContent = 'Memproses Dokumen...';
   btn.disabled = true;
+
+  const authorsPayload = state.authorMode === 'group'
+    ? state.groupMembers.map((m) => ({ name: (m.name || '').trim(), nim: (m.nim || '').trim() })).filter((m) => m.name || m.nim)
+    : [{ name: document.getElementById('covAuthor').value.trim(), nim: document.getElementById('covNim').value.trim() }];
 
   const payloadConfig = {
     ...state.config,
@@ -889,6 +1013,9 @@ async function processAndDownloadDocx() {
       headings: state.config.heading_mode !== 'skip'
     },
     cover_data: {
+      author_mode: state.authorMode,
+      group_name: document.getElementById('covGroupName') ? document.getElementById('covGroupName').value : '',
+      authors: authorsPayload,
       doc_label: document.getElementById('covDocLabel').value,
       course: document.getElementById('covCourse').value,
       title: document.getElementById('covTitle').value,

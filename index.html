@@ -22,7 +22,6 @@
       </div>
       <div class="brand-title">
         DocFormat Studio
-        <span class="brand-pill">OpenXML Engine v3.0</span>
       </div>
     </div>
 
@@ -408,53 +407,82 @@
         <div class="group-header">
           <div>
             <div class="group-title">Data Halaman Sampul (Cover) Otomatis</div>
-            <div class="group-subtitle">Digunakan saat opsi Halaman Cover diatur ke Otomatis atau Selalu Buat Baru</div>
+            <div class="group-subtitle">Mendukung penyusunan perorangan (individu) maupun kelompok dengan NIM/NPM per anggota</div>
+          </div>
+          <div class="segmented-pills" id="authorModeGroup" style="width:210px;">
+            <button type="button" class="seg-btn active" data-mode="single">Sendiri / Individu</button>
+            <button type="button" class="seg-btn" data-mode="group">Kelompok</button>
           </div>
         </div>
 
         <div class="field-grid-2" style="margin-bottom:10px;">
           <div class="form-field">
             <label class="form-label" for="covDocLabel">Label Jenis Dokumen</label>
-            <input type="text" id="covDocLabel" class="input-control" value="MAKALAH" placeholder="MAKALAH / LAPORAN AKHIR / SKRIPSI" />
+            <input type="text" id="covDocLabel" class="input-control" value="" placeholder="Contoh: MAKALAH / LAPORAN AKHIR / SKRIPSI" />
           </div>
           <div class="form-field">
             <label class="form-label" for="covCourse">Mata Kuliah / Proyek (Opsional)</label>
-            <input type="text" id="covCourse" class="input-control" value="Metodologi Penelitian &amp; Tata Tulis Ilmiah" placeholder="Nama Mata Kuliah" />
+            <input type="text" id="covCourse" class="input-control" value="" placeholder="Contoh: Metodologi Penelitian &amp; Tata Tulis Ilmiah" />
           </div>
         </div>
 
         <div class="form-field" style="margin-bottom:10px;">
           <label class="form-label" for="covTitle">Judul Lengkap Laporan / Makalah</label>
-          <input type="text" id="covTitle" class="input-control" value="IMPLEMENTASI OTOMATISASI TATA LETAK DOKUMEN KARYA ILMIAH BERBASIS OPENXML" placeholder="Masukkan judul dokumen..." />
+          <input type="text" id="covTitle" class="input-control" value="" placeholder="Contoh: ANALISIS DAN OTOMATISASI TATA LETAK DOKUMEN KARYA TULIS ILMIAH" />
         </div>
 
-        <div class="field-grid-3" style="margin-bottom:10px;">
+        <!-- MODE SENDIRI / INDIVIDU -->
+        <div id="singleAuthorSection" class="field-grid-2" style="margin-bottom:10px;">
           <div class="form-field">
-            <label class="form-label" for="covAuthor">Nama Penyusun / Kelompok</label>
-            <input type="text" id="covAuthor" class="input-control" value="Ahmad Fauzan &amp; Tim Peneliti" />
+            <label class="form-label" for="covAuthor">Nama Lengkap Penyusun</label>
+            <input type="text" id="covAuthor" class="input-control" value="" placeholder="Contoh: Ahmad Fauzan" />
           </div>
           <div class="form-field">
             <label class="form-label" for="covNim">NIM / NPM / NIP</label>
-            <input type="text" id="covNim" class="input-control tnum" value="2201040089" />
-          </div>
-          <div class="form-field">
-            <label class="form-label" for="covLecturer">Dosen Pengampu / Pembimbing</label>
-            <input type="text" id="covLecturer" class="input-control" value="Dr. Ir. Hendra Wijaya, M.Kom." />
+            <input type="text" id="covNim" class="input-control tnum" value="" placeholder="Contoh: 2201040089" />
           </div>
         </div>
 
-        <div class="field-grid-3">
+        <!-- MODE KELOMPOK -->
+        <div id="groupAuthorSection" style="display:none;margin-bottom:12px;padding:12px;border-radius:9px;background:var(--bg-app);border:1px solid var(--border-subtle);">
+          <div class="field-grid-2" style="margin-bottom:10px;align-items:end;">
+            <div class="form-field">
+              <label class="form-label" for="covGroupName">Nama / Nomor Kelompok (Opsional)</label>
+              <input type="text" id="covGroupName" class="input-control" value="" placeholder="Contoh: Kelompok 3" />
+            </div>
+            <div style="display:flex;justify-content:flex-end;">
+              <button type="button" id="btnAddMember" class="btn-add-member">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Tambah Anggota Kelompok
+              </button>
+            </div>
+          </div>
+
+          <div class="member-list-stack" id="groupMembersList"></div>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:10px;">
           <div class="form-field">
-            <label class="form-label" for="covFaculty">Fakultas / Program Studi</label>
-            <input type="text" id="covFaculty" class="input-control" value="FAKULTAS ILMU KOMPUTER" />
+            <label class="form-label" for="covLecturer">Dosen Pengampu / Pembimbing</label>
+            <input type="text" id="covLecturer" class="input-control" value="" placeholder="Contoh: Dr. Ir. Hendra Wijaya, M.Kom." />
           </div>
           <div class="form-field">
+            <label class="form-label" for="covFaculty">Fakultas / Program Studi</label>
+            <input type="text" id="covFaculty" class="input-control" value="" placeholder="Contoh: FAKULTAS ILMU KOMPUTER" />
+          </div>
+        </div>
+
+        <div class="field-grid-2">
+          <div class="form-field">
             <label class="form-label" for="covInstitution">Nama Universitas / Instansi</label>
-            <input type="text" id="covInstitution" class="input-control" value="UNIVERSITAS INDONESIA RAYA" />
+            <input type="text" id="covInstitution" class="input-control" value="" placeholder="Contoh: UNIVERSITAS INDONESIA RAYA" />
           </div>
           <div class="form-field">
             <label class="form-label" for="covYear">Kota &amp; Tahun</label>
-            <input type="text" id="covYear" class="input-control tnum" value="JAKARTA • 2026" />
+            <input type="text" id="covYear" class="input-control tnum" value="" placeholder="Contoh: JAKARTA • 2026" />
           </div>
         </div>
       </div>
@@ -463,7 +491,7 @@
     <!-- RIGHT COLUMN: LIVE INTERACTIVE PAPER SIMULATOR & STATS -->
     <aside class="col-panel col-right">
       <div class="preview-toolbar">
-        <span class="section-title" style="color:var(--text-primary);">Simulasi Kertas Live</span>
+        <span class="section-title" style="color:var(--text-primary);">Preview</span>
         <div class="preview-tabs" id="previewTabs">
           <button type="button" class="preview-tab active" data-tab="body">Isi Bab</button>
           <button type="button" class="preview-tab" data-tab="cover">Cover</button>
@@ -483,26 +511,30 @@
       </div>
 
       <div class="stats-drawer" id="statsDrawer">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span class="section-title">Ringkasan Spesifikasi Aktif</span>
-          <span id="activeSpecBadge" class="brand-pill tnum">A4 • 4-4-3-3</span>
+        <div class="spec-header-row">
+          <span class="section-title">Konfigurasi Dokumen</span>
+          <span class="spec-meta-text tnum" id="activeSpecBadge">
+            <span id="specPaperText">Kertas A4</span>
+            <span class="spec-meta-dot"></span>
+            <span id="specMarginText">4 / 4 / 3 / 3 cm</span>
+          </span>
         </div>
-        <div class="stats-grid tnum" id="liveSpecGrid">
-          <div class="stat-item">
-            <span class="stat-val" id="stFont">Times New Roman</span>
-            <span class="stat-lbl">Font &amp; Ukuran Utama</span>
+        <div class="spec-table-list tnum" id="liveSpecGrid">
+          <div class="spec-row-item">
+            <span class="spec-row-key">Tipografi Utama</span>
+            <span class="spec-row-val" id="stFont">Times New Roman, 12 pt</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-val" id="stSpacing">1.5 Baris • Justify</span>
-            <span class="stat-lbl">Spasi &amp; Perataan</span>
+          <div class="spec-row-item">
+            <span class="spec-row-key">Paragraf &amp; Spasi</span>
+            <span class="spec-row-val" id="stSpacing">Spasi 1.5 • Rata Kiri-Kanan</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-val" id="stParaCount">Siap Proses</span>
-            <span class="stat-lbl">Status Dokumen</span>
+          <div class="spec-row-item">
+            <span class="spec-row-key">Struktur &amp; Kelengkapan</span>
+            <span class="spec-row-val" id="stExtras">Heading 1/2/3 • Cover • TOC</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-val" id="stExtras">Heading 1/2/3 Aktif</span>
-            <span class="stat-lbl">Kelengkapan</span>
+          <div class="spec-row-item">
+            <span class="spec-row-key">Status Naskah</span>
+            <span class="spec-row-val" id="stParaCount">Siap Diproses</span>
           </div>
         </div>
       </div>
