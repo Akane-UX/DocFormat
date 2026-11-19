@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocFormat Studio — Otomatisasi Format Laporan, Makalah & Skripsi (.DOCX)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-cluster">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="8" y1="13" x2="16" y2="13"></line>
+          <line x1="8" y1="17" x2="13" y2="17"></line>
+        </svg>
+      </div>
+      <div class="brand-title">
+        DocFormat Studio
+        <span class="brand-pill">OpenXML Engine v2.4</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" id="btnLoadSample" class="btn btn-secondary" title="Muat contoh file DOCX berantakan untuk uji coba">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <path d="M12 18v-6"></path>
+          <path d="M9 15l3 3 3-3"></path>
+        </svg>
+        Gunakan Contoh DOCX Berantakan
+      </button>
+
+      <button type="button" id="btnProcessDoc" class="btn btn-brand">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4"></path>
+          <path d="m16.2 7.8 2.9-2.9"></path>
+          <path d="M18 12h4"></path>
+          <path d="m16.2 16.2 2.9 2.9"></path>
+          <path d="M12 18v4"></path>
+          <path d="m4.9 19.1 2.9-2.9"></path>
+          <path d="M2 12h4"></path>
+          <path d="m4.9 4.9 2.9 2.9"></path>
+        </svg>
+        <span id="btnProcessLabel">Rapikan &amp; Unduh DOCX</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="workspace-grid">
+    <!-- LEFT COLUMN: UPLOAD, PRESETS, MODULE CHECKLIST -->
+    <aside class="col-panel col-left">
+      <div class="panel-card">
+        <div class="section-header">
+          <span class="section-title">1. Dokumen Sumber (.DOCX)</span>
+          <span id="fileSizeBadge" class="brand-pill tnum" style="display:none;">0 KB</span>
+        </div>
+
+        <input type="file" id="fileInput" accept=".docx" style="display:none;" />
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </div>
+          <div class="dropzone-title" id="dropzoneTitle">Unggah atau Tarik File .DOCX</div>
+          <div class="dropzone-sub">Mendukung Laporan, Makalah, Skripsi &amp; Proposal</div>
+        </div>
+
+        <div id="fileStatusBox" class="file-status-box">
+          <div class="file-meta-top">
+            <span class="file-name" id="inspectedFilename">dokumen.docx</span>
+          </div>
+          <div class="file-badges" id="inspectedBadges"></div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="section-header">
+          <span class="section-title">2. Jenis &amp; Standar Dokumen</span>
+        </div>
+        <div id="presetList" class="preset-grid"></div>
+      </div>
+
+      <div class="panel-card">
+        <div class="section-header">
+          <span class="section-title">3. Bagian yang Dirapikan</span>
+          <button type="button" id="btnToggleAllModules" style="border:none;background:none;color:var(--brand);font-size:11.5px;font-weight:600;cursor:pointer;">Pilih Semua</button>
+        </div>
+        <div class="module-checklist" id="moduleChecklist">
+          <label class="module-chip checked" data-mod="margin">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Margin &amp; Kertas</span>
+          </label>
+          <label class="module-chip checked" data-mod="font">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Jenis Font</span>
+          </label>
+          <label class="module-chip checked" data-mod="font_size">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Ukuran Teks</span>
+          </label>
+          <label class="module-chip checked" data-mod="alignment">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Perataan Teks</span>
+          </label>
+          <label class="module-chip checked" data-mod="line_spacing">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Spasi Baris</span>
+          </label>
+          <label class="module-chip checked" data-mod="paragraph_spacing">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Jarak Paragraf</span>
+          </label>
+          <label class="module-chip checked" data-mod="indentation">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Indentasi Alenia</span>
+          </label>
+          <label class="module-chip checked" data-mod="headings">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Heading Bab/Sub</span>
+          </label>
+          <label class="module-chip checked" data-mod="page_numbers">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Nomor Halaman</span>
+          </label>
+          <label class="module-chip checked" data-mod="tables">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Format Tabel</span>
+          </label>
+          <label class="module-chip checked" data-mod="clean_empty_lines">
+            <input type="checkbox" checked />
+            <span class="chip-box">✓</span>
+            <span>Hapus Enter Kosong</span>
+          </label>
+          <label class="module-chip" data-mod="auto_toc">
+            <input type="checkbox" />
+            <span class="chip-box">✓</span>
+            <span>Daftar Isi Otomatis</span>
+          </label>
+          <label class="module-chip" data-mod="auto_cover" style="grid-column: span 2;">
+            <input type="checkbox" />
+            <span class="chip-box">✓</span>
+            <span>Buat Cover Otomatis (Jika Belum Ada)</span>
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER COLUMN: GRANULAR FORMATTING CONTROLS -->
+    <section class="col-panel col-center">
+      <!-- GROUP A: MARGIN & UKURAN KERTAS -->
+      <div class="config-group" id="groupMargin">
+        <div class="group-header">
+          <div>
+            <div class="group-title">Tata Letak Kertas &amp; Margin Halaman</div>
+            <div class="group-subtitle">Atur ukuran kertas dan batas tepi (Atas, Kiri, Bawah, Kanan dalam cm)</div>
+          </div>
+          <select id="paperSize" class="select-control" style="width:130px;">
+            <option value="A4">A4 (21 × 29.7 cm)</option>
+            <option value="F4">F4 / Folio (21.5 × 33 cm)</option>
+            <option value="Letter">Letter (21.6 × 27.9 cm)</option>
+            <option value="Legal">Legal (21.6 × 35.6 cm)</option>
+          </select>
+        </div>
+
+        <div class="form-field" style="margin-bottom:12px;">
+          <span class="form-label">Preset Margin Cepat</span>
+          <div class="segmented-pills" id="marginPresetGroup">
+            <button type="button" class="seg-btn active" data-margin="4,4,3,3">Umum 4-4-3-3 (Atas/Kiri 4, Bawah/Kanan 3)</button>
+            <button type="button" class="seg-btn" data-margin="3,4,3,3">3-4-3-3 (Kiri 4)</button>
+            <button type="button" class="seg-btn" data-margin="3,3,3,3">Merata 3-3-3-3</button>
+            <button type="button" class="seg-btn" data-margin="2.54,2.54,2.54,2.54">Normal 2.54 cm</button>
+          </div>
+        </div>
+
+        <div class="field-grid-4 tnum">
+          <div class="form-field">
+            <label class="form-label" for="marginTop">Atas (Top) cm</label>
+            <input type="number" id="marginTop" class="input-control" step="0.1" min="1" max="8" value="4.0" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="marginLeft">Kiri (Left) cm</label>
+            <input type="number" id="marginLeft" class="input-control" step="0.1" min="1" max="8" value="4.0" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="marginBottom">Bawah (Bottom) cm</label>
+            <input type="number" id="marginBottom" class="input-control" step="0.1" min="1" max="8" value="3.0" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="marginRight">Kanan (Right) cm</label>
+            <input type="number" id="marginRight" class="input-control" step="0.1" min="1" max="8" value="3.0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP B: TIPOGRAFI, JENIS FONT & UKURAN TEKS -->
+      <div class="config-group" id="groupTypography">
+        <div class="group-header">
+          <div>
+            <div class="group-title">Tipografi, Jenis Font &amp; Ukuran Teks</div>
+            <div class="group-subtitle">Penyeragaman huruf isi paragraf, judul bab, sub-bab, serta isi tabel</div>
+          </div>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:12px;">
+          <div class="form-field">
+            <label class="form-label" for="fontName">Jenis Font Dokumen</label>
+            <select id="fontName" class="select-control">
+              <option value="Times New Roman">Times New Roman (Standar Karya Ilmiah)</option>
+              <option value="Arial">Arial (Laporan Teknis / Dinas)</option>
+              <option value="Calibri">Calibri (Dokumen Modern)</option>
+              <option value="Georgia">Georgia (Editorial Akademik)</option>
+              <option value="Garamond">Garamond (Buku &amp; Monograf)</option>
+              <option value="Bookman Old Style">Bookman Old Style</option>
+              <option value="Tahoma">Tahoma</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fontSizeBody">Ukuran Teks Isi (Body pt)</label>
+            <select id="fontSizeBody" class="select-control tnum">
+              <option value="10">10 pt</option>
+              <option value="11">11 pt</option>
+              <option value="12" selected>12 pt (Standar Laporan/Makalah)</option>
+              <option value="13">13 pt</option>
+              <option value="14">14 pt</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-grid-3 tnum">
+          <div class="form-field">
+            <label class="form-label" for="fontSizeH1">Judul BAB (Heading 1)</label>
+            <select id="fontSizeH1" class="select-control">
+              <option value="12">12 pt (Bold)</option>
+              <option value="13">13 pt (Bold)</option>
+              <option value="14" selected>14 pt (Bold - Standar)</option>
+              <option value="16">16 pt (Bold)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fontSizeH2">Sub-Bab (Heading 2)</label>
+            <select id="fontSizeH2" class="select-control">
+              <option value="11">11 pt (Bold)</option>
+              <option value="12" selected>12 pt (Bold - Standar)</option>
+              <option value="13">13 pt (Bold)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="fontSizeTable">Ukuran Teks Tabel</label>
+            <select id="fontSizeTable" class="select-control">
+              <option value="9">9 pt</option>
+              <option value="10" selected>10 pt (Rapi &amp; Proporsional)</option>
+              <option value="11">11 pt</option>
+              <option value="12">12 pt</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP C: PERATAAN, SPASI BARIS, INDENTASI & JARAK PARAGRAF -->
+      <div class="config-group" id="groupParagraph">
+        <div class="group-header">
+          <div>
+            <div class="group-title">Perataan Paragraf, Spasi Baris &amp; Indentasi</div>
+            <div class="group-subtitle">Kontrol rata kiri/kanan/tengah/justify, line spacing, dan jarak antar alenia</div>
+          </div>
+        </div>
+
+        <div class="form-field" style="margin-bottom:12px;">
+          <span class="form-label">Perataan Teks Paragraf Utama (Alignment)</span>
+          <div class="segmented-pills" id="alignBodyGroup">
+            <button type="button" class="seg-btn active" data-align="both">Rata Kiri-Kanan (Justify)</button>
+            <button type="button" class="seg-btn" data-align="left">Rata Kiri (Left)</button>
+            <button type="button" class="seg-btn" data-align="center">Rata Tengah (Center)</button>
+            <button type="button" class="seg-btn" data-align="right">Rata Kanan (Right)</button>
+          </div>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:12px;">
+          <div class="form-field">
+            <span class="form-label">Spasi Baris (Line Spacing)</span>
+            <div class="segmented-pills tnum" id="lineSpacingGroup">
+              <button type="button" class="seg-btn" data-spacing="1.0">1.0</button>
+              <button type="button" class="seg-btn" data-spacing="1.15">1.15</button>
+              <button type="button" class="seg-btn active" data-spacing="1.5">1.5 (Standar)</button>
+              <button type="button" class="seg-btn" data-spacing="2.0">2.0 (Skripsi)</button>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label" for="firstLineIndent">Indentasi Baris Pertama (Alenia)</label>
+            <select id="firstLineIndent" class="select-control tnum">
+              <option value="1.27" selected>1.27 cm (0.5 inch - Standar Tab)</option>
+              <option value="1.0">1.00 cm (6 Ketuk)</option>
+              <option value="1.5">1.50 cm</option>
+              <option value="0">0 cm (Tanpa Indentasi / Block)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-grid-2 tnum">
+          <div class="form-field">
+            <label class="form-label" for="spaceBefore">Jarak Sebelum Paragraf (Before pt)</label>
+            <select id="spaceBefore" class="select-control">
+              <option value="0" selected>0 pt (Standar)</option>
+              <option value="3">3 pt</option>
+              <option value="6">6 pt</option>
+              <option value="12">12 pt</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="spaceAfter">Jarak Sesudah Paragraf (After pt)</label>
+            <select id="spaceAfter" class="select-control">
+              <option value="0">0 pt (Rapat / Skripsi 2.0)</option>
+              <option value="4">4 pt</option>
+              <option value="6" selected>6 pt (Standar Laporan/Makalah)</option>
+              <option value="8">8 pt</option>
+              <option value="10">10 pt</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP D: HEADING BAB, SUB-BAB & PENOMORAN HALAMAN -->
+      <div class="config-group" id="groupStructure">
+        <div class="group-header">
+          <div>
+            <div class="group-title">Heading Bab, Sub-Bab &amp; Penomoran Halaman</div>
+            <div class="group-subtitle">Aturan judul BAB baru, kapitalisasi, warna teks, dan letak nomor halaman</div>
+          </div>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:10px;">
+          <div class="form-field">
+            <label class="form-label" for="alignH1">Perataan Judul BAB (Heading 1)</label>
+            <select id="alignH1" class="select-control">
+              <option value="center" selected>Rata Tengah (Center - Standar BAB)</option>
+              <option value="left">Rata Kiri (Left)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="pageNumPos">Posisi Penomoran Halaman</label>
+            <select id="pageNumPos" class="select-control">
+              <option value="bottom_right" selected>Bawah Kanan (Footer Right)</option>
+              <option value="bottom_center">Bawah Tengah (Footer Center)</option>
+              <option value="top_right">Atas Kanan (Header Right)</option>
+              <option value="none">Tanpa Nomor Halaman</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="switch-label">Mulai Setiap BAB di Halaman Baru (Page Break Before)</div>
+            <div class="switch-sub">Otomatis memindahkan BAB I, BAB II, BAB III, Daftar Pustaka ke lembaran baru</div>
+          </div>
+          <div id="swPageBreakBab" class="toggle-switch on" role="switch" aria-checked="true"></div>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="switch-label">Kapitalisasi Judul BAB Otomatis (UPPERCASE)</div>
+            <div class="switch-sub">Mengubah "bab i pendahuluan" menjadi "BAB I PENDAHULUAN" cetak tebal</div>
+          </div>
+          <div id="swUppercaseBab" class="toggle-switch on" role="switch" aria-checked="true"></div>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <div class="switch-label">Netralkan Warna Teks ke Hitam Resmi (#000000)</div>
+            <div class="switch-sub">Menghapus warna teks biru/merah/abu-abu hasil copy-paste dari web</div>
+          </div>
+          <div id="swForceBlack" class="toggle-switch on" role="switch" aria-checked="true"></div>
+        </div>
+      </div>
+
+      <!-- GROUP E: GENERATOR COVER / HALAMAN SAMPUL OTOMATIS -->
+      <div class="config-group" id="groupCover">
+        <div class="group-header">
+          <div>
+            <div class="group-title">Halaman Sampul (Cover) Otomatis</div>
+            <div class="group-subtitle">Disisipkan di halaman pertama apabila dokumen belum memiliki cover</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;cursor:pointer;">
+            <input type="checkbox" id="chkForceCover" />
+            <span>Paksa Tambah Cover</span>
+          </label>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:10px;">
+          <div class="form-field">
+            <label class="form-label" for="covDocLabel">Label Jenis Dokumen</label>
+            <input type="text" id="covDocLabel" class="input-control" value="MAKALAH" placeholder="MAKALAH / LAPORAN AKHIR / SKRIPSI" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="covCourse">Mata Kuliah / Proyek (Opsional)</label>
+            <input type="text" id="covCourse" class="input-control" value="Metodologi Penelitian &amp; Tata Tulis Ilmiah" placeholder="Nama Mata Kuliah" />
+          </div>
+        </div>
+
+        <div class="form-field" style="margin-bottom:10px;">
+          <label class="form-label" for="covTitle">Judul Lengkap Laporan / Makalah</label>
+          <input type="text" id="covTitle" class="input-control" value="IMPLEMENTASI OTOMATISASI TATA LETAK DOKUMEN KARYA ILMIAH BERBASIS OPENXML" placeholder="Masukkan judul dokumen..." />
+        </div>
+
+        <div class="field-grid-3" style="margin-bottom:10px;">
+          <div class="form-field">
+            <label class="form-label" for="covAuthor">Nama Penyusun / Kelompok</label>
+            <input type="text" id="covAuthor" class="input-control" value="Ahmad Fauzan &amp; Tim Peneliti" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="covNim">NIM / NPM / NIP</label>
+            <input type="text" id="covNim" class="input-control tnum" value="2201040089" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="covLecturer">Dosen Pengampu / Pembimbing</label>
+            <input type="text" id="covLecturer" class="input-control" value="Dr. Ir. Hendra Wijaya, M.Kom." />
+          </div>
+        </div>
+
+        <div class="field-grid-3">
+          <div class="form-field">
+            <label class="form-label" for="covFaculty">Fakultas / Program Studi</label>
+            <input type="text" id="covFaculty" class="input-control" value="FAKULTAS ILMU KOMPUTER" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="covInstitution">Nama Universitas / Instansi</label>
+            <input type="text" id="covInstitution" class="input-control" value="UNIVERSITAS INDONESIA RAYA" />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="covYear">Kota &amp; Tahun</label>
+            <input type="text" id="covYear" class="input-control tnum" value="JAKARTA • 2026" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: LIVE INTERACTIVE PAPER SIMULATOR & STATS -->
+    <aside class="col-panel col-right">
+      <div class="preview-toolbar">
+        <span class="section-title" style="color:var(--text-primary);">Simulasi Kertas Live</span>
+        <div class="preview-tabs" id="previewTabs">
+          <button type="button" class="preview-tab active" data-tab="body">Isi Bab</button>
+          <button type="button" class="preview-tab" data-tab="cover">Cover</button>
+          <button type="button" class="preview-tab" data-tab="toc">Daftar Isi</button>
+        </div>
+      </div>
+
+      <div class="paper-stage" id="paperStage">
+        <span class="margin-badge mb-top tnum" id="mbTop">4.0 cm</span>
+        <span class="margin-badge mb-left tnum" id="mbLeft">4.0 cm</span>
+        <span class="margin-badge mb-bottom tnum" id="mbBottom">3.0 cm</span>
+        <span class="margin-badge mb-right tnum" id="mbRight">3.0 cm</span>
+
+        <div class="paper-margin-guide" id="paperMarginBox"></div>
+        <div class="paper-content" id="paperContent"></div>
+        <div class="pv-page-num tnum" id="pvPageNum">1</div>
+      </div>
+
+      <div class="stats-drawer" id="statsDrawer">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="section-title">Ringkasan Spesifikasi Aktif</span>
+          <span id="activeSpecBadge" class="brand-pill tnum">A4 • 4-4-3-3</span>
+        </div>
+        <div class="stats-grid tnum" id="liveSpecGrid">
+          <div class="stat-item">
+            <span class="stat-val" id="stFont">Times New Roman</span>
+            <span class="stat-lbl">Font &amp; Ukuran Utama</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stSpacing">1.5 Baris • Justify</span>
+            <span class="stat-lbl">Spasi &amp; Perataan</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stParaCount">Siap Proses</span>
+            <span class="stat-lbl">Status Dokumen</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stExtras">Penomoran Aktif</span>
+            <span class="stat-lbl">Kelengkapan</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toastBanner" class="toast-banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span id="toastText">Dokumen berhasil dirapikan!</span>
+  </div>
+
+  <script src="docx_client_engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
