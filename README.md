@@ -66,3 +66,7 @@ Buka `http://localhost:8090` pada browser.
 ### Opsi 2: Menggunakan Static Web Server / Live Preview
 
 Karena aplikasi dilengkapi dengan `docx_client_engine.js`, Anda juga dapat menyajikan direktori proyek ini menggunakan server statis apa pun (seperti VS Code Live Server atau `python3 -m http.server`) dengan membuka `index.html`.
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah [MIT License](LICENSE).
