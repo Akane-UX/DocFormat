@@ -718,6 +718,16 @@ async function loadSampleMessyDocx() {
   }
 }
 
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(2)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
+}
+
 // Memvalidasi, menginspeksi struktur, dan menyiapkan file DOCX yang dipilih
 async function handleFileSelected(file) {
   if (!file.name.toLowerCase().endsWith('.docx')) {
@@ -725,10 +735,12 @@ async function handleFileSelected(file) {
     return;
   }
   state.currentFile = file;
-  document.getElementById('dropzoneTitle').textContent = file.name;
+  const dropzoneTitle = document.getElementById('dropzoneTitle');
+  dropzoneTitle.textContent = file.name;
+  dropzoneTitle.title = file.name;
   const sizeBadge = document.getElementById('fileSizeBadge');
-  sizeBadge.style.display = 'inline-block';
-  sizeBadge.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+  sizeBadge.style.display = 'inline-flex';
+  sizeBadge.textContent = formatFileSize(file.size);
 
   let info = null;
   try {
@@ -773,7 +785,9 @@ async function handleFileSelected(file) {
 function renderInspectionSummary(info) {
   const box = document.getElementById('fileStatusBox');
   box.classList.add('visible');
-  document.getElementById('inspectedFilename').textContent = info.filename;
+  const filenameEl = document.getElementById('inspectedFilename');
+  filenameEl.textContent = info.filename;
+  filenameEl.title = info.filename;
 
   const badges = document.getElementById('inspectedBadges');
   const m = info.current_margins_cm || { top: 2.54, left: 2.54, bottom: 2.54, right: 2.54 };
