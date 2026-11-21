@@ -18,18 +18,23 @@ NAMESPACES = {
 W_NS = f"{{{NAMESPACES['w']}}}"
 XML_NS = f"{{{NAMESPACES['xml']}}}"
 
+# Membentuk nama tag XML dengan namespace WordprocessingML (w:)
 def w_tag(name: str) -> str:
     return f"{W_NS}{name}"
 
+# Mengonversi ukuran sentimeter ke satuan twips
 def cm_to_twips(cm: float) -> int:
     return int(round((cm / 2.54) * 1440))
 
+# Mengonversi ukuran font poin (pt) ke half-points
 def pt_to_half_pt(pt: float) -> int:
     return int(round(pt * 2))
 
+# Mengonversi ukuran poin (pt) ke satuan twips
 def pt_to_twips(pt: float) -> int:
     return int(round(pt * 20))
 
+# Mengonversi pengali spasi baris menjadi nilai twips (basis 240)
 def line_spacing_to_twips(multiplier: float) -> int:
     return int(round(multiplier * 240))
 
@@ -99,6 +104,7 @@ FIRST_CONTENT_REGEX = re.compile(
     re.IGNORECASE
 )
 
+# Mengekstrak teks bersih dari elemen paragraf (mengabaikan instrText)
 def get_paragraph_text(p_elem) -> str:
     texts = []
     for t in p_elem.findall(f'.//{w_tag("t")}'):
@@ -109,6 +115,7 @@ def get_paragraph_text(p_elem) -> str:
     raw = ''.join(texts).replace('\u00A0', ' ')
     return re.sub(r'[ \t]+', ' ', raw).strip()
 
+# Mengecek apakah paragraf memuat gambar, shape, objek, atau persamaan
 def has_drawing_or_pict(p_elem) -> bool:
     for el in p_elem.iter():
         local = etree.QName(el).localname if isinstance(el.tag, str) else ''
@@ -116,6 +123,7 @@ def has_drawing_or_pict(p_elem) -> bool:
             return True
     return False
 
+# Mengecek apakah paragraf memiliki section break atau page/column break
 def has_section_or_page_break(p_elem) -> bool:
     for el in p_elem.iter():
         local = etree.QName(el).localname if isinstance(el.tag, str) else ''
@@ -127,6 +135,7 @@ def has_section_or_page_break(p_elem) -> bool:
             return True
     return False
 
+# Mengecek apakah seluruh run teks non-kosong pada paragraf berformat tebal
 def is_paragraph_bold(p_elem) -> bool:
     runs = p_elem.findall(f'./{w_tag("r")}')
     if not runs:
@@ -145,6 +154,7 @@ def is_paragraph_bold(p_elem) -> bool:
                 bold_runs += 1
     return non_empty_runs > 0 and bold_runs == non_empty_runs
 
+# Mengambil ukuran font terbesar (dalam pt) di dalam paragraf
 def get_paragraph_max_font_pt(p_elem) -> float:
     max_pt = 0.0
     for sz in p_elem.findall(f'.//{w_tag("sz")}'):
@@ -153,6 +163,7 @@ def get_paragraph_max_font_pt(p_elem) -> float:
             max_pt = max(max_pt, int(v) / 2.0)
     return max_pt
 
+# Mengecek apakah paragraf termasuk item daftar/list (numPr atau bullet/angka)
 def is_list_paragraph(p_elem) -> bool:
     pPr = p_elem.find(w_tag('pPr'))
     if pPr is not None and pPr.find(w_tag('numPr')) is not None:
@@ -162,6 +173,7 @@ def is_list_paragraph(p_elem) -> bool:
         return True
     return False
 
+# Mendeteksi indeks batas akhir halaman cover pada awal dokumen
 def detect_cover_boundary(paragraphs: list) -> int:
     limit = min(45, len(paragraphs))
     keyword_hits = 0
@@ -208,6 +220,7 @@ def detect_cover_boundary(paragraphs: list) -> int:
 
     return 0
 
+# Mengklasifikasikan jenis paragraf (heading, caption, list, media, atau body)
 def classify_paragraph(p_elem, idx: int, total_p: int, prev_is_bab_only: bool = False) -> str:
     txt = get_paragraph_text(p_elem)
     if has_drawing_or_pict(p_elem) and len(txt) < 120:
@@ -273,16 +286,19 @@ def classify_paragraph(p_elem, idx: int, total_p: int, prev_is_bab_only: bool = 
 
     return 'body'
 
+# Mengambil atau membuat elemen anak dengan tag tertentu pada parent
 def ensure_child(parent, tag_name: str):
     child = parent.find(w_tag(tag_name))
     if child is None:
         child = etree.SubElement(parent, w_tag(tag_name))
     return child
 
+# Menghapus semua elemen anak dengan tag tertentu jika ada
 def remove_child_if_exists(parent, tag_name: str):
     for child in list(parent.findall(w_tag(tag_name))):
         parent.remove(child)
 
+# Memastikan elemen properti paragraf (w:pPr) tersedia di awal paragraf
 def ensure_pPr(p_elem):
     pPr = p_elem.find(w_tag('pPr'))
     if pPr is None:
@@ -290,6 +306,7 @@ def ensure_pPr(p_elem):
         p_elem.insert(0, pPr)
     return pPr
 
+# Memastikan elemen properti run (w:rPr) tersedia di awal run
 def ensure_rPr(r_elem):
     rPr = r_elem.find(w_tag('rPr'))
     if rPr is None:
@@ -297,6 +314,7 @@ def ensure_rPr(r_elem):
         r_elem.insert(0, rPr)
     return rPr
 
+# Membersihkan tab, spasi berlebih, dan karakter tak terlihat dalam paragraf
 def sanitize_paragraph_text_and_spacing(p_elem, strip_tabs: bool = True, collapse_spaces: bool = True):
     if strip_tabs:
         for r in p_elem.findall(f'./{w_tag("r")}'):
@@ -329,6 +347,7 @@ def sanitize_paragraph_text_and_spacing(p_elem, strip_tabs: bool = True, collaps
             if stripped:
                 break
 
+# Mengatur font, ukuran, tebal, miring, dan warna teks pada elemen run
 def set_run_font_and_size(r_elem, font_name: str = None, size_pt: float = None,
                           bold: bool = None, italic: bool = None, color_hex: str = None,
                           apply_font: bool = True, apply_size: bool = True, clean_run_overrides: bool = True):
@@ -388,6 +407,7 @@ def set_run_font_and_size(r_elem, font_name: str = None, size_pt: float = None,
             if w_tag(theme_attr) in col.attrib:
                 del col.attrib[w_tag(theme_attr)]
 
+# Mengatur perataan, spasi, indentasi, style, dan page break pada paragraf
 def set_paragraph_format(p_elem, align: str = None, line_spacing: float = None,
                          space_before_pt: float = None, space_after_pt: float = None,
                          first_line_cm: float = None, hanging_cm: float = None,
@@ -468,6 +488,7 @@ def set_paragraph_format(p_elem, align: str = None, line_spacing: float = None,
     else:
         remove_child_if_exists(pPr, 'pageBreakBefore')
 
+# Memperbarui atau menambahkan style Normal dan Heading1-4 di styles.xml
 def ensure_heading_styles_in_styles_xml(styles_xml_bytes: bytes, font_name: str, size_body: float,
                                         size_h1: float, size_h2: float, size_h3: float,
                                         align_h1: str, align_h2: str, line_spacing: float) -> bytes:
@@ -485,6 +506,7 @@ def ensure_heading_styles_in_styles_xml(styles_xml_bytes: bytes, font_name: str,
             if w_tag(attr) in rFonts.attrib:
                 del rFonts.attrib[w_tag(attr)]
 
+    # Membuat atau memperbarui satu definisi style paragraf pada tree styles.xml
     def upsert_style(style_id: str, style_name: str, size_pt: float, align: str,
                      bold: bool, outline_lvl: int = None, space_before_pt: float = 0, space_after_pt: float = 6):
         existing = tree.xpath(f'./w:style[@w:styleId="{style_id}"]', namespaces=NAMESPACES)
@@ -548,6 +570,7 @@ def ensure_heading_styles_in_styles_xml(styles_xml_bytes: bytes, font_name: str,
 
     return etree.tostring(tree, xml_declaration=True, encoding='UTF-8', standalone='yes')
 
+# Memformat ulang run teks judul BAB (satu baris atau pisah baris)
 def format_bab_heading_runs(p_elem, txt: str, bab_layout: str, uppercase_bab: bool,
                             font_name: str, size_pt: float, apply_font: bool):
     clean_txt = re.sub(r'\s+', ' ', txt).strip()
@@ -581,6 +604,7 @@ def format_bab_heading_runs(p_elem, txt: str, bab_layout: str, uppercase_bab: bo
     t = etree.SubElement(r, w_tag('t'))
     t.text = clean_txt
 
+# Membuat elemen paragraf baru lengkap dengan format dan run teksnya
 def make_styled_paragraph(text: str, font_name: str, size_pt: float, align: str = 'center',
                           bold: bool = False, italic: bool = False, space_before_pt: float = 0,
                           space_after_pt: float = 6, line_spacing: float = 1.5,
@@ -602,6 +626,7 @@ def make_styled_paragraph(text: str, font_name: str, size_pt: float, align: str 
         t.text = text.upper() if uppercase else text
     return p
 
+# Membuat elemen paragraf berisi page break
 def make_page_break_paragraph():
     p = etree.Element(w_tag('p'))
     r = etree.SubElement(p, w_tag('r'))
@@ -609,9 +634,11 @@ def make_page_break_paragraph():
     br.set(w_tag('type'), 'page')
     return p
 
+# Mengecek apakah dokumen sudah memiliki halaman cover
 def detect_has_cover(paragraphs) -> bool:
     return detect_cover_boundary(paragraphs) > 0
 
+# Mengecek apakah dokumen sudah memiliki bagian Daftar Isi
 def detect_has_toc(paragraphs) -> bool:
     for p in paragraphs[:45]:
         txt = get_paragraph_text(p).strip().upper()
@@ -619,6 +646,7 @@ def detect_has_toc(paragraphs) -> bool:
             return True
     return False
 
+# Menyusun daftar elemen paragraf halaman cover dari data formulir
 def build_cover_elements(cover_data: dict, font_name: str) -> list:
     elems = []
     doc_label = (cover_data.get('doc_label') or 'MAKALAH / LAPORAN').strip()
@@ -685,6 +713,7 @@ def build_cover_elements(cover_data: dict, font_name: str) -> list:
     elems.append(make_page_break_paragraph())
     return elems
 
+# Menyusun elemen paragraf Daftar Isi beserta field TOC dan titik-titik
 def build_toc_elements(headings: list, font_name: str, size_pt: float, line_spacing: float) -> list:
     elems = []
     elems.append(make_styled_paragraph(
@@ -761,6 +790,7 @@ def build_toc_elements(headings: list, font_name: str, size_pt: float, line_spac
     elems.append(make_page_break_paragraph())
     return elems
 
+# Membuat XML header atau footer berisi field nomor halaman otomatis
 def build_page_number_xml(font_name: str, size_pt: float, align: str = 'right', is_header: bool = False) -> bytes:
     root_tag = 'hdr' if is_header else 'ftr'
     root = etree.Element(w_tag(root_tag), nsmap={'w': NAMESPACES['w']})
@@ -795,6 +825,7 @@ def build_page_number_xml(font_name: str, size_pt: float, align: str = 'right', 
 
     return etree.tostring(root, xml_declaration=True, encoding='UTF-8', standalone='yes')
 
+# Menginspeksi byte DOCX untuk menghitung statistik, heading, margin, cover, dan TOC
 def inspect_docx_bytes(docx_bytes: bytes) -> dict:
     with zipfile.ZipFile(io.BytesIO(docx_bytes), 'r') as zin:
         xml_content = zin.read('word/document.xml')
@@ -850,6 +881,7 @@ def inspect_docx_bytes(docx_bytes: bytes) -> dict:
         'current_margins_cm': current_margins
     }
 
+# Memformat seluruh isi dokumen DOCX sesuai konfigurasi dan mengembalikan hasilnya beserta statistik
 def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
     enabled = config.get('enabled_modules', {})
     do_margin = enabled.get('margin', True)
@@ -1317,6 +1349,7 @@ def format_docx_bytes(docx_bytes: bytes, config: dict) -> tuple[bytes, dict]:
 
     return out_mem.getvalue(), stats
 
+# Membuat file DOCX contoh dengan format berantakan untuk uji coba
 def create_sample_messy_docx() -> bytes:
     content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

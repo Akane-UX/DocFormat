@@ -2,18 +2,22 @@ const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const XML_NS = 'http://www.w3.org/XML/1998/namespace';
 
+// Mengonversi ukuran sentimeter ke satuan twips
 function cmToTwips(cm) {
   return Math.round((parseFloat(cm) / 2.54) * 1440);
 }
 
+// Mengonversi ukuran font poin (pt) ke half-points
 function ptToHalfPt(pt) {
   return Math.round(parseFloat(pt) * 2);
 }
 
+// Mengonversi ukuran poin (pt) ke satuan twips
 function ptToTwips(pt) {
   return Math.round(parseFloat(pt) * 20);
 }
 
+// Mengonversi pengali spasi baris menjadi nilai twips (basis 240)
 function lineSpacingToTwips(mult) {
   return Math.round(parseFloat(mult) * 240);
 }
@@ -37,6 +41,7 @@ const CRC32_TABLE = (() => {
   return table;
 })();
 
+// Menghitung checksum CRC32 dari array byte
 function crc32(u8) {
   let crc = 0xFFFFFFFF;
   for (let i = 0; i < u8.length; i++) {
@@ -45,6 +50,7 @@ function crc32(u8) {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
+// Mendekompresi byte deflate-raw menggunakan DecompressionStream
 async function inflateRawBytes(compressedBytes) {
   const ds = new DecompressionStream('deflate-raw');
   const writer = ds.writable.getWriter();
@@ -68,6 +74,7 @@ async function inflateRawBytes(compressedBytes) {
   return out;
 }
 
+// Mengompresi byte menggunakan deflate-raw via CompressionStream
 async function deflateRawBytes(rawBytes) {
   const cs = new CompressionStream('deflate-raw');
   const writer = cs.writable.getWriter();
@@ -91,6 +98,7 @@ async function deflateRawBytes(rawBytes) {
   return out;
 }
 
+// Membaca seluruh entri file dari arsip ZIP/DOCX menjadi Map
 async function readZipEntries(arrayBuffer) {
   const u8 = new Uint8Array(arrayBuffer);
   const dv = new DataView(arrayBuffer);
@@ -139,6 +147,7 @@ async function readZipEntries(arrayBuffer) {
   return fileMap;
 }
 
+// Mengemas Map file menjadi arsip ZIP/DOCX berbentuk Blob
 async function writeZipEntries(fileMap) {
   const enc = new TextEncoder();
   const localParts = [];
@@ -225,6 +234,7 @@ const CAPTION_REGEX = /^\s*(?:Gambar|Tabel|Lampiran|Figure|Table|Bagan|Grafik)\s
 const COVER_KEYWORDS = /(DISUSUN\s+OLEH|DIAJUKAN\s+UNTUK|OLEH\s*:|DOSEN\s+PENGAMPU|GURU\s+PEMBIMBING|PROGRAM\s+STUDI|JURUSAN|FAKULTAS|UNIVERSITAS|INSTITUT|POLITEKNIK|SEKOLAH\s+TINGGI|SMA\s+|SMK\s+|MAKALAH|LAPORAN\s+(?:PRAKTIKUM|AKHIR|PENELITIAN|OBSERVASI|KERJA\s+PRAKTEK|MAGANG|TUGAS)|SKRIPSI|TESIS|PROPOSAL|NIM\s*[:.]?|NPM\s*[:.]?|NIDN\s*[:.]?|KELOMPOK\s+\d+|TAHUN\s+AJARAN|TAHUN\s+AKADEMIK)/i;
 const FIRST_CONTENT_REGEX = /^\s*(BAB\s+(?:I|1)\b|KATA\s+PENGANTAR|PRAKATA|ABSTRAK|ABSTRACT|DAFTAR\s+ISI|PENDAHULUAN|1\.\s+PENDAHULUAN|A\.\s+LATAR\s+BELAKANG|1\.1\s+LATAR\s+BELAKANG)/i;
 
+// Mengambil elemen anak langsung dengan localName tertentu
 function getDirectChildren(parent, localName) {
   const out = [];
   if (!parent || !parent.childNodes) return out;
@@ -237,6 +247,7 @@ function getDirectChildren(parent, localName) {
   return out;
 }
 
+// Mengambil elemen anak langsung pertama dengan localName tertentu
 function getFirstDirectChild(parent, localName) {
   if (!parent || !parent.childNodes) return null;
   for (let i = 0; i < parent.childNodes.length; i++) {
@@ -246,12 +257,14 @@ function getFirstDirectChild(parent, localName) {
   return null;
 }
 
+// Menghapus semua elemen anak langsung dengan localName tertentu
 function removeDirectChildren(parent, localName) {
   for (const ch of getDirectChildren(parent, localName)) {
     parent.removeChild(ch);
   }
 }
 
+// Mengambil seluruh elemen turunan dengan localName tertentu
 function getAllDescendants(parent, localName) {
   const out = [];
   if (!parent) return out;
@@ -262,24 +275,29 @@ function getAllDescendants(parent, localName) {
   return out;
 }
 
+// Mengambil nilai atribut ber-namespace w: dari elemen XML
 function getWAttr(el, attrLocal) {
   if (!el) return null;
   return el.getAttribute(`w:${attrLocal}`) || el.getAttributeNS(W_NS, attrLocal) || el.getAttribute(attrLocal);
 }
 
+// Mengatur nilai atribut ber-namespace w: pada elemen XML
 function setWAttr(el, attrLocal, val) {
   el.setAttribute(`w:${attrLocal}`, String(val));
 }
 
+// Menghapus atribut ber-namespace w: dari elemen XML
 function removeWAttr(el, attrLocal) {
   el.removeAttribute(`w:${attrLocal}`);
   el.removeAttributeNS(W_NS, attrLocal);
 }
 
+// Membuat elemen XML baru dengan namespace WordprocessingML (w:)
 function createWEl(xmlDoc, localName) {
   return xmlDoc.createElementNS(W_NS, `w:${localName}`);
 }
 
+// Mengambil atau membuat elemen anak langsung w: pada parent
 function ensureDirectChild(xmlDoc, parent, localName) {
   let child = getFirstDirectChild(parent, localName);
   if (!child) {
@@ -289,6 +307,7 @@ function ensureDirectChild(xmlDoc, parent, localName) {
   return child;
 }
 
+// Memastikan elemen properti paragraf (w:pPr) tersedia di awal paragraf
 function ensurePPr(xmlDoc, p) {
   let pPr = getFirstDirectChild(p, 'pPr');
   if (!pPr) {
@@ -298,6 +317,7 @@ function ensurePPr(xmlDoc, p) {
   return pPr;
 }
 
+// Memastikan elemen properti run (w:rPr) tersedia di awal run
 function ensureRPr(xmlDoc, r) {
   let rPr = getFirstDirectChild(r, 'rPr');
   if (!rPr) {
@@ -307,6 +327,7 @@ function ensureRPr(xmlDoc, r) {
   return rPr;
 }
 
+// Mengekstrak teks bersih dari elemen paragraf (mengabaikan instrText)
 function getParagraphText(p) {
   const tNodes = getAllDescendants(p, 't');
   let s = '';
@@ -317,6 +338,7 @@ function getParagraphText(p) {
   return s.replace(/[ \t]+/g, ' ').trim();
 }
 
+// Mengecek apakah paragraf memuat gambar, shape, objek, atau persamaan
 function hasMedia(p) {
   const all = p.getElementsByTagName('*');
   for (let i = 0; i < all.length; i++) {
@@ -328,6 +350,7 @@ function hasMedia(p) {
   return false;
 }
 
+// Mengecek apakah paragraf memiliki section break atau page/column break
 function hasSectionOrPageBreak(p) {
   const all = p.getElementsByTagName('*');
   for (let i = 0; i < all.length; i++) {
@@ -341,6 +364,7 @@ function hasSectionOrPageBreak(p) {
   return false;
 }
 
+// Mengecek apakah seluruh run teks non-kosong pada paragraf berformat tebal
 function isParagraphBold(p) {
   const runs = getDirectChildren(p, 'r');
   if (!runs.length) return false;
@@ -359,6 +383,7 @@ function isParagraphBold(p) {
   return nonEmpty > 0 && boldCount === nonEmpty;
 }
 
+// Mengambil ukuran font terbesar (dalam pt) di dalam paragraf
 function getParagraphMaxFontPt(p) {
   let maxPt = 0;
   for (const sz of getAllDescendants(p, 'sz')) {
@@ -368,6 +393,7 @@ function getParagraphMaxFontPt(p) {
   return maxPt;
 }
 
+// Mengecek apakah paragraf termasuk item daftar/list (numPr atau bullet/angka)
 function isListParagraph(p) {
   const pPr = getFirstDirectChild(p, 'pPr');
   if (pPr && getFirstDirectChild(pPr, 'numPr')) return true;
@@ -375,6 +401,7 @@ function isListParagraph(p) {
   return /^\s*(?:[-•*➢▪▫]|\d+\)|[a-z]\)|\([0-9a-z]+\))\s+\S+/.test(txt);
 }
 
+// Mendeteksi indeks batas akhir halaman cover pada awal dokumen
 function detectCoverBoundary(paragraphs) {
   const limit = Math.min(45, paragraphs.length);
   let keywordHits = 0;
@@ -430,6 +457,7 @@ function detectCoverBoundary(paragraphs) {
   return 0;
 }
 
+// Mengklasifikasikan jenis paragraf (heading, caption, list, media, atau body)
 function classifyParagraph(p, prevIsBabOnly = false) {
   const txt = getParagraphText(p);
   if (hasMedia(p) && txt.length < 120) return 'media';
@@ -482,6 +510,7 @@ function classifyParagraph(p, prevIsBabOnly = false) {
   return 'body';
 }
 
+// Membersihkan tab, spasi berlebih, dan karakter tak terlihat dalam paragraf
 function sanitizeParagraphWhitespace(xmlDoc, p, stripTabs = true, collapseSpaces = true) {
   if (stripTabs) {
     for (const r of getDirectChildren(p, 'r')) {
@@ -519,10 +548,12 @@ function sanitizeParagraphWhitespace(xmlDoc, p, stripTabs = true, collapseSpaces
   }
 }
 
+// Mengecek apakah dokumen sudah memiliki halaman cover
 function detectHasCover(paragraphs) {
   return detectCoverBoundary(paragraphs) > 0;
 }
 
+// Mengecek apakah dokumen sudah memiliki bagian Daftar Isi
 function detectHasToc(paragraphs) {
   const limit = Math.min(45, paragraphs.length);
   for (let i = 0; i < limit; i++) {
@@ -532,6 +563,7 @@ function detectHasToc(paragraphs) {
   return false;
 }
 
+// Mengatur font, ukuran, tebal, miring, dan warna teks pada elemen run
 function setRunFontAndSize(xmlDoc, r, opts) {
   const rPr = ensureRPr(xmlDoc, r);
   if (opts.cleanOverrides !== false) {
@@ -581,6 +613,7 @@ function setRunFontAndSize(xmlDoc, r, opts) {
   }
 }
 
+// Mengatur perataan, spasi, indentasi, style, dan page break pada paragraf
 function setParagraphFormat(xmlDoc, p, opts) {
   const pPr = ensurePPr(xmlDoc, p);
   ['contextualSpacing', 'mirrorIndents', 'framePr', 'shd'].forEach((t) => removeDirectChildren(pPr, t));
@@ -649,6 +682,7 @@ function setParagraphFormat(xmlDoc, p, opts) {
   }
 }
 
+// Memformat ulang run teks judul BAB (satu baris atau pisah baris)
 function formatBabHeadingRuns(xmlDoc, p, txt, babLayout, uppercaseBab, fontName, sizePt, applyFont) {
   let cleanTxt = txt.replace(/\s+/g, ' ').trim();
   if (uppercaseBab) cleanTxt = cleanTxt.toUpperCase();
@@ -689,6 +723,7 @@ function formatBabHeadingRuns(xmlDoc, p, txt, babLayout, uppercaseBab, fontName,
   p.appendChild(r);
 }
 
+// Membuat elemen paragraf baru lengkap dengan format dan run teksnya
 function makeStyledParagraph(xmlDoc, text, fontName, sizePt, opts = {}) {
   const p = createWEl(xmlDoc, 'p');
   setParagraphFormat(xmlDoc, p, {
@@ -722,6 +757,7 @@ function makeStyledParagraph(xmlDoc, text, fontName, sizePt, opts = {}) {
   return p;
 }
 
+// Membuat elemen paragraf berisi page break
 function makePageBreakParagraph(xmlDoc) {
   const p = createWEl(xmlDoc, 'p');
   const r = createWEl(xmlDoc, 'r');
@@ -732,6 +768,7 @@ function makePageBreakParagraph(xmlDoc) {
   return p;
 }
 
+// Menyusun daftar node paragraf halaman cover dari data formulir
 function buildCoverNodes(xmlDoc, coverData, fontName) {
   const nodes = [];
   const docLabel = (coverData.doc_label || 'MAKALAH / LAPORAN').trim();
@@ -796,6 +833,7 @@ function buildCoverNodes(xmlDoc, coverData, fontName) {
   return nodes;
 }
 
+// Menyusun node paragraf Daftar Isi beserta tab leader titik-titik
 function buildTocNodes(xmlDoc, headings, fontName, sizePt, lineSpacing) {
   const nodes = [];
   nodes.push(makeStyledParagraph(xmlDoc, 'DAFTAR ISI', fontName, sizePt + 2, {
@@ -863,6 +901,7 @@ function buildTocNodes(xmlDoc, headings, fontName, sizePt, lineSpacing) {
   return nodes;
 }
 
+// Memperbarui atau menambahkan style Normal dan Heading1-4 di styles.xml
 function updateStylesXmlInPlace(existingStylesBytes, fontName, sizeBody, sizeH1, sizeH2, sizeH3, alignH1, alignH2, lineSpacing) {
   const dec = new TextDecoder('utf-8');
   const enc = new TextEncoder();
@@ -886,6 +925,7 @@ function updateStylesXmlInPlace(existingStylesBytes, fontName, sizeBody, sizeH1,
     ['asciiTheme', 'hAnsiTheme', 'cstheme', 'eastAsiaTheme'].forEach((a) => removeWAttr(rFonts, a));
   }
 
+  // Membuat atau memperbarui satu definisi style paragraf pada stylesDoc
   function upsertStyle(styleId, styleName, sizePt, align, bold, outlineLvl, spaceBeforePt, spaceAfterPt) {
     let st = getDirectChildren(root, 'style').find((el) => getWAttr(el, 'styleId') === styleId);
     if (!st) {
@@ -951,6 +991,7 @@ function updateStylesXmlInPlace(existingStylesBytes, fontName, sizeBody, sizeH1,
   return enc.encode(new XMLSerializer().serializeToString(stylesDoc));
 }
 
+// Membuat string XML header atau footer berisi field nomor halaman otomatis
 function buildPageNumberXmlString(fontName, sizePt, align, isHeader) {
   const tag = isHeader ? 'hdr' : 'ftr';
   const half = ptToHalfPt(sizePt);
@@ -982,6 +1023,7 @@ function buildPageNumberXmlString(fontName, sizePt, align, isHeader) {
 </w:${tag}>`;
 }
 
+// Menginspeksi ArrayBuffer DOCX untuk menghitung statistik, heading, margin, cover, dan TOC
 async function inspectDocxArrayBuffer(arrayBuffer, filename, sizeBytes) {
   const fileMap = await readZipEntries(arrayBuffer);
   if (!fileMap.has('word/document.xml')) {
@@ -1050,6 +1092,7 @@ async function inspectDocxArrayBuffer(arrayBuffer, filename, sizeBytes) {
   };
 }
 
+// Memformat seluruh isi dokumen DOCX dari ArrayBuffer dan mengembalikan Blob beserta statistik
 async function formatDocxArrayBuffer(arrayBuffer, config) {
   const fileMap = await readZipEntries(arrayBuffer);
   const dec = new TextDecoder('utf-8');
@@ -1542,6 +1585,7 @@ async function formatDocxArrayBuffer(arrayBuffer, config) {
   return { blob: outBlob, stats };
 }
 
+// Membuat Blob DOCX contoh dengan format berantakan untuk uji coba di browser
 async function generateSampleMessyDocxBlob() {
   const enc = new TextEncoder();
   const fileMap = new Map();

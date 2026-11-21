@@ -198,14 +198,17 @@ DOCUMENT_PRESETS = {
     }
 }
 
+# Menyajikan halaman utama aplikasi
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
 
+# Mengembalikan daftar preset format dokumen
 @app.route('/api/presets', methods=['GET'])
 def get_presets():
     return jsonify({'presets': list(DOCUMENT_PRESETS.values())})
 
+# Menghasilkan dan mengirim file DOCX contoh yang berantakan
 @app.route('/api/sample', methods=['GET'])
 def get_sample():
     sample_bytes = docx_engine.create_sample_messy_docx()
@@ -216,6 +219,7 @@ def get_sample():
         download_name='Contoh_Draft_Laporan_Berantakan.docx'
     )
 
+# Menerima file DOCX dan mengembalikan ringkasan struktur dokumen
 @app.route('/api/inspect', methods=['POST'])
 def inspect_document():
     if 'file' not in request.files:
@@ -232,6 +236,7 @@ def inspect_document():
     except Exception as e:
         return jsonify({'error': f'Gagal membaca struktur DOCX: {str(e)}'}), 400
 
+# Memformat file DOCX sesuai konfigurasi dan mengirim hasilnya
 @app.route('/api/format', methods=['POST'])
 def format_document():
     if 'file' not in request.files:

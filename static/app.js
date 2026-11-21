@@ -237,6 +237,7 @@ const PAPER_DIMS_CM = {
   Legal: { w: 21.59, h: 35.56 }
 };
 
+// Menampilkan notifikasi toast sementara di layar
 function showToast(msg) {
   const banner = document.getElementById('toastBanner');
   const txt = document.getElementById('toastText');
@@ -248,6 +249,7 @@ function showToast(msg) {
   }, 3800);
 }
 
+// Menginisialisasi komponen UI, preset, event listener, dan pratinjau awal
 async function initApp() {
   renderPresetButtons();
   renderGroupMembersList();
@@ -257,6 +259,7 @@ async function initApp() {
   fetchPresetsIfBackendUp();
 }
 
+// Merender daftar input anggota kelompok dan mengikat event hapus/ubah
 function renderGroupMembersList() {
   const container = document.getElementById('groupMembersList');
   if (!container) return;
@@ -308,6 +311,7 @@ function renderGroupMembersList() {
   });
 }
 
+// Mengambil daftar preset dari backend jika server aktif
 async function fetchPresetsIfBackendUp() {
   try {
     const res = await fetch('/api/presets');
@@ -325,6 +329,7 @@ async function fetchPresetsIfBackendUp() {
   } catch (_) {}
 }
 
+// Merender tombol pilihan preset format dokumen
 function renderPresetButtons() {
   const container = document.getElementById('presetList');
   if (!container) return;
@@ -361,6 +366,7 @@ function renderPresetButtons() {
   });
 }
 
+// Mengaktifkan modul pemformatan berdasarkan preset cakupan yang dipilih
 function applyScopePreset(mode) {
   state.scopeMode = mode;
   if (mode === 'all') {
@@ -401,6 +407,7 @@ function applyScopePreset(mode) {
   renderLivePaper();
 }
 
+// Menyelaraskan seluruh nilai kontrol form UI dengan state saat ini
 function syncControlsFromState() {
   const c = state.config;
   document.getElementById('selScopeMode').value = state.scopeMode;
@@ -462,6 +469,7 @@ function syncControlsFromState() {
   document.getElementById('groupAuthorSection').style.display = state.authorMode === 'group' ? 'block' : 'none';
 }
 
+// Memperbarui tampilan visual dan atribut aria tombol switch
 function setSwitchVisual(id, isOn) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -469,6 +477,7 @@ function setSwitchVisual(id, isOn) {
   el.setAttribute('aria-checked', isOn ? 'true' : 'false');
 }
 
+// Mengikat seluruh event listener elemen UI (upload, kontrol format, cover, dan tab)
 function bindUIEvents() {
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
@@ -677,6 +686,7 @@ function bindUIEvents() {
   });
 }
 
+// Mengganti tab pratinjau aktif dan merender ulang kertas pratinjau
 function setPreviewTab(tabName) {
   state.previewTab = tabName;
   document.querySelectorAll('#previewTabs .preview-tab').forEach((b) => {
@@ -685,6 +695,7 @@ function setPreviewTab(tabName) {
   renderLivePaper();
 }
 
+// Memuat file DOCX contoh berantakan dari backend atau engine klien
 async function loadSampleMessyDocx() {
   try {
     let blob = null;
@@ -707,6 +718,7 @@ async function loadSampleMessyDocx() {
   }
 }
 
+// Memvalidasi, menginspeksi struktur, dan menyiapkan file DOCX yang dipilih
 async function handleFileSelected(file) {
   if (!file.name.toLowerCase().endsWith('.docx')) {
     showToast('Harap pilih file berformat .DOCX');
@@ -757,6 +769,7 @@ async function handleFileSelected(file) {
   }
 }
 
+// Menampilkan ringkasan hasil inspeksi dokumen (paragraf, kata, heading, margin, cover, TOC)
 function renderInspectionSummary(info) {
   const box = document.getElementById('fileStatusBox');
   box.classList.add('visible');
@@ -777,6 +790,7 @@ function renderInspectionSummary(info) {
   document.getElementById('stParaCount').textContent = `${info.paragraph_count} Paragraf • ${info.heading_count} Bab`;
 }
 
+// Merender pratinjau kertas dokumen secara langsung sesuai konfigurasi aktif
 function renderLivePaper() {
   const c = state.config;
   const dims = PAPER_DIMS_CM[c.paper_size] || PAPER_DIMS_CM.A4;
@@ -990,6 +1004,7 @@ function renderLivePaper() {
   document.getElementById('stExtras').textContent = extras.length ? extras.join(' • ') : 'Standar Isi';
 }
 
+// Memproses pemformatan DOCX via backend atau klien lalu mengunduh hasilnya
 async function processAndDownloadDocx() {
   if (!state.currentFile) {
     await loadSampleMessyDocx();
@@ -1082,6 +1097,7 @@ async function processAndDownloadDocx() {
   }
 }
 
+// Meng-escape karakter khusus HTML untuk mencegah injeksi markup
 function escapeHtml(str) {
   return String(str || '')
     .replace(/&/g, '&amp;')
